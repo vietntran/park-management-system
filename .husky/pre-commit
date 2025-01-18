@@ -1,0 +1,14 @@
+# Check for .only in test files
+echo "🔍 Checking for .only in test files..."
+ONLY_FILES=$(find . -type f \( -name "*.test.*" -o -name "*.spec.*" \) -not -path "./node_modules/*" | xargs grep -l "\.only" || true)
+if [ -n "$ONLY_FILES" ]; then
+    echo "❌ Error: Found .only in the following test files:"
+    echo "$ONLY_FILES"
+    exit 1
+else
+    echo "✅ No .only found in test files"
+fi
+
+# Run lint-staged
+echo "Running lint-staged..."
+npx lint-staged

@@ -1,0 +1,153 @@
+// This is your Prisma schema file
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// NextAuth.js required models
+model Account {
+  id                String  @id @default(cuid())
+  userId            String  @map("user_id")
+  type              String
+  provider          String
+  providerAccountId String  @map("provider_account_id")
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique @map("session_token")
+  userId       String   @map("user_id")
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// Existing models with NextAuth.js integration
+model User {
+  id              String   @id @default(uuid())
+  password        String?
+  email           String   @unique
+  phone           String
+  name            String
+  address         Boolean
+  emailVerified   DateTime? // Changed to DateTime? for NextAuth.js compatibility
+  phoneVerified   Boolean  @map("phone_verified")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  // NextAuth.js relations
+  accounts        Account[]
+  sessions        Session[]
+
+  // Existing relations
+  primaryReservations    Reservation[]
+  reservationUsers       ReservationUser[]
+  transfersFrom         ReservationTransfer[] @relation("FromUser")
+  transfersTo           ReservationTransfer[] @relation("ToUser")
+  cancelledReservations ReservationCancellation[]
+
+  @@map("users")
+}
+
+model Reservation {
+  id              String   @id @default(uuid())
+  primaryUserId   String   @map("primary_user_id")
+  reservationDate DateTime @map("reservation_date")
+  createdAt       DateTime @default(now()) @map("created_at")
+  isCancelled     Boolean  @default(false) @map("is_cancelled")
+  isTransferable  Boolean  @default(true) @map("is_transferable")
+
+  // Relations
+  primaryUser     User                    @relation(fields: [primaryUserId], references: [id])
+  reservationUsers ReservationUser[]
+  transfers       ReservationTransfer[]
+  dateCapacity    DateCapacity            @relation(fields: [reservationDate], references: [date])
+  cancellation    ReservationCancellation?
+
+  @@index([primaryUserId, reservationDate]) // Added for consecutive dates checking
+  @@map("reservations")
+}
+
+model ReservationUser {
+  reservationId String   @map("reservation_id")
+  userId        String   @map("user_id")
+  isPrimary     Boolean  @default(false) @map("is_primary")
+  canModify     Boolean  @default(false) @map("can_modify")
+  canTransfer   Boolean  @default(false) @map("can_transfer")
+  addedAt       DateTime @default(now()) @map("added_at")
+
+  // Relations
+  reservation    Reservation @relation(fields: [reservationId], references: [id])
+  user          User        @relation(fields: [userId], references: [id])
+
+  @@id([reservationId, userId])
+  @@map("reservation_users")
+}
+
+model ReservationTransfer {
+  id             String   @id @default(uuid())
+  reservationId  String   @map("reservation_id")
+  fromUserId     String   @map("from_user_id")
+  toUserId       String   @map("to_user_id")
+  transferredAt  DateTime @default(now()) @map("transferred_at")
+  transferReason String   @map("transfer_reason")
+  isApproved     Boolean  @default(false) @map("is_approved")
+
+  // Relations
+  reservation    Reservation @relation(fields: [reservationId], references: [id])
+  fromUser       User        @relation("FromUser", fields: [fromUserId], references: [id])
+  toUser         User        @relation("ToUser", fields: [toUserId], references: [id])
+
+  @@map("reservation_transfers")
+}
+
+model DateCapacity {
+  date           DateTime @id
+  totalBookings  Int      @default(0)
+  maxCapacity    Int      @default(60)
+  
+  // Relations
+  reservations   Reservation[]
+
+  @@map("date_capacities")
+}
+
+model ReservationCancellation {
+  id            String   @id @default(uuid())
+  reservationId String   @unique @map("reservation_id")
+  userId        String   @map("user_id")
+  cancelledAt   DateTime @default(now()) @map("cancelled_at")
+  reason        String?
+  refundIssued  Boolean  @default(false) @map("refund_issued")
+
+  // Relations
+  reservation   Reservation @relation(fields: [reservationId], references: [id])
+  user          User       @relation(fields: [userId], references: [id])
+
+  @@map("reservation_cancellations")
+}
