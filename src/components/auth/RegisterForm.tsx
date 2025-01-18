@@ -1,23 +1,8 @@
 import { Eye, EyeOff } from "lucide-react";
 import { useRouter } from "next/navigation";
 import React, { useState } from "react";
-import { z } from "zod";
 
-const registerSchema = z.object({
-  email: z.string().email("Invalid email address"),
-  password: z
-    .string()
-    .min(12, "Password must be at least 12 characters")
-    .max(128, "Password cannot exceed 128 characters")
-    .regex(
-      /^(?=.*[A-Z])(?=.*[a-z])(?=.*[0-9])(?=.*[!@#$%^&*(),.?":{}|<>]).*$/,
-      "Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character (!@#$%^&*(),.?&quot;:{}|<>)"
-    ),
-  name: z.string().min(1, "Name is required"),
-  phone: z.string().regex(/^\d{10}$/, "Phone number must be exactly 10 digits"),
-});
-
-type RegisterFormData = z.infer<typeof registerSchema>;
+import { registerSchema, type RegisterFormData } from "@/lib/validations/auth";
 
 export default function RegisterForm() {
   const router = useRouter();
@@ -186,6 +171,25 @@ export default function RegisterForm() {
             lowercase, numbers, and special characters (!@#$%^&*(),.?&quot;:{}
             |&lt;&gt;)
           </div>
+        </div>
+        <div>
+          <label className="flex items-center">
+            <input
+              type="checkbox"
+              name="acceptTerms"
+              onChange={(e) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  acceptTerms: e.target.checked,
+                }))
+              }
+              className="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+              required
+            />
+            <span className="ml-2 text-sm text-gray-600">
+              I accept the terms and conditions
+            </span>
+          </label>
         </div>
         <button
           type="submit"
