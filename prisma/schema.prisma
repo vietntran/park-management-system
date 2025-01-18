@@ -1,4 +1,4 @@
-// This is your Prisma schema file
+// This is your Prisma schema file,
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
@@ -55,10 +55,12 @@ model User {
   email           String   @unique
   phone           String
   name            String
-  address         Boolean
   emailVerified   DateTime? // Changed to DateTime? for NextAuth.js compatibility
   phoneVerified   Boolean  @map("phone_verified")
   createdAt       DateTime @default(now()) @map("created_at")
+
+  // Address relation
+  address         Address?
 
   // NextAuth.js relations
   accounts        Account[]
@@ -72,6 +74,24 @@ model User {
   cancelledReservations ReservationCancellation[]
 
   @@map("users")
+}
+
+// New Address model
+model Address {
+  id        String   @id @default(uuid())
+  userId    String   @unique @map("user_id")
+  line1     String
+  line2     String?
+  city      String
+  state     String
+  zipCode   String   @map("zip_code")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relation to User
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("addresses")
 }
 
 model Reservation {
