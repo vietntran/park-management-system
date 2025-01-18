@@ -1,15 +1,29 @@
 import { Eye, EyeOff } from "lucide-react";
 import { useRouter } from "next/navigation";
 import React, { useState } from "react";
-
 import { registerSchema, type RegisterFormData } from "@/lib/validations/auth";
+import AddressForm from "@/components/forms/AddressForm";
+import type { Address, PartialAddress } from "@/types/address";
+
+type FormData = Omit<RegisterFormData, 'address'> & {
+  address?: PartialAddress;
+};
 
 export default function RegisterForm() {
   const router = useRouter();
   const [error, setError] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [formData, setFormData] = useState<Partial<RegisterFormData>>({});
+  const [showAddress, setShowAddress] = useState(false);
+  const [formData, setFormData] = useState<Partial<FormData>>({
+    address: {
+      line1: "",
+      line2: "",
+      city: "",
+      state: "",
+      zipCode: ""
+    }
+  });
   const [attempts, setAttempts] = useState(0);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -25,7 +39,15 @@ export default function RegisterForm() {
       return;
     }
 
-    const result = registerSchema.safeParse(formData);
+    // Clean up address data before submission
+    const submissionData = {
+      ...formData,
+      address: showAddress && formData.address && Object.values(formData.address).some(Boolean)
+        ? formData.address
+        : undefined
+    };
+
+    const result = registerSchema.safeParse(submissionData);
 
     if (!result.success) {
       setError(result.error.errors[0]?.message || "Invalid form data");
@@ -64,6 +86,20 @@ export default function RegisterForm() {
     }));
   };
 
+  const handleAddressChange = (field: keyof Address, value: string) => {
+    setFormData((prev) => {
+      const updatedAddress: PartialAddress = {
+        ...(prev.address || {}),
+        [field]: value
+      };
+      
+      return {
+        ...prev,
+        address: updatedAddress
+      };
+    });
+  };
+
   return (
     <div className="max-w-md mx-auto mt-8 p-6 bg-white rounded-lg shadow-md">
       <h2 className="text-2xl font-bold mb-6 text-center">Register</h2>
@@ -84,7 +120,7 @@ export default function RegisterForm() {
             type="text"
             id="name"
             name="name"
-            value={formData.name || ""}
+            value={formData.name ?? ""}
             onChange={handleChange}
             required
             className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
@@ -102,7 +138,7 @@ export default function RegisterForm() {
             type="email"
             id="email"
             name="email"
-            value={formData.email || ""}
+            value={formData.email ?? ""}
             onChange={handleChange}
             required
             className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
@@ -120,7 +156,7 @@ export default function RegisterForm() {
             type="tel"
             id="phone"
             name="phone"
-            value={formData.phone || ""}
+            value={formData.phone ?? ""}
             onChange={handleChange}
             required
             pattern="[0-9]{10}"
@@ -141,7 +177,7 @@ export default function RegisterForm() {
               type={showPassword ? "text" : "password"}
               id="password"
               name="password"
-              value={formData.password || ""}
+              value={formData.password ?? ""}
               onChange={handleChange}
               required
               minLength={12}
@@ -172,12 +208,33 @@ export default function RegisterForm() {
             |&lt;&gt;)
           </div>
         </div>
+
+        <div className="border-t pt-4">
+          <div className="flex items-center justify-between mb-4">
+            <span className="text-sm font-medium text-gray-700">Address (Optional)</span>
+            <button
+              type="button"
+              onClick={() => setShowAddress(!showAddress)}
+              className="text-sm text-blue-600 hover:text-blue-500"
+            >
+              {showAddress ? "Hide Address" : "Add Address"}
+            </button>
+          </div>
+
+          {showAddress && (
+            <AddressForm
+              address={formData.address}
+              onChange={handleAddressChange}
+            />
+          )}
+        </div>
+
         <div>
           <label className="flex items-center">
             <input
               type="checkbox"
               name="acceptTerms"
-              onChange={(e) =>
+              onChange={(e) => 
                 setFormData((prev) => ({
                   ...prev,
                   acceptTerms: e.target.checked,
@@ -191,6 +248,7 @@ export default function RegisterForm() {
             </span>
           </label>
         </div>
+
         <button
           type="submit"
           disabled={loading}
