@@ -17,7 +17,7 @@ export const authOptions: NextAuthOptions = {
     strategy: "jwt",
   },
   pages: {
-    signIn: "/login",
+    signIn: "/auth/login", // Updated to match new directory structure
   },
   providers: [
     GoogleProvider({
