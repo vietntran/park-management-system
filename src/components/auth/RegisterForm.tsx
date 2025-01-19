@@ -1,11 +1,12 @@
 import { Eye, EyeOff } from "lucide-react";
 import { useRouter } from "next/navigation";
 import React, { useState } from "react";
-import { registerSchema, type RegisterFormData } from "@/lib/validations/auth";
+
 import AddressForm from "@/components/forms/AddressForm";
+import { registerSchema, type RegisterFormData } from "@/lib/validations/auth";
 import type { Address, PartialAddress } from "@/types/address";
 
-type FormData = Omit<RegisterFormData, 'address'> & {
+type FormData = Omit<RegisterFormData, "address"> & {
   address?: PartialAddress;
 };
 
@@ -21,8 +22,8 @@ export default function RegisterForm() {
       line2: "",
       city: "",
       state: "",
-      zipCode: ""
-    }
+      zipCode: "",
+    },
   });
   const [attempts, setAttempts] = useState(0);
 
@@ -42,9 +43,12 @@ export default function RegisterForm() {
     // Clean up address data before submission
     const submissionData = {
       ...formData,
-      address: showAddress && formData.address && Object.values(formData.address).some(Boolean)
-        ? formData.address
-        : undefined
+      address:
+        showAddress &&
+        formData.address &&
+        Object.values(formData.address).some(Boolean)
+          ? formData.address
+          : undefined,
     };
 
     const result = registerSchema.safeParse(submissionData);
@@ -90,12 +94,12 @@ export default function RegisterForm() {
     setFormData((prev) => {
       const updatedAddress: PartialAddress = {
         ...(prev.address || {}),
-        [field]: value
+        [field]: value,
       };
-      
+
       return {
         ...prev,
-        address: updatedAddress
+        address: updatedAddress,
       };
     });
   };
@@ -211,7 +215,9 @@ export default function RegisterForm() {
 
         <div className="border-t pt-4">
           <div className="flex items-center justify-between mb-4">
-            <span className="text-sm font-medium text-gray-700">Address (Optional)</span>
+            <span className="text-sm font-medium text-gray-700">
+              Address (Optional)
+            </span>
             <button
               type="button"
               onClick={() => setShowAddress(!showAddress)}
@@ -234,7 +240,7 @@ export default function RegisterForm() {
             <input
               type="checkbox"
               name="acceptTerms"
-              onChange={(e) => 
+              onChange={(e) =>
                 setFormData((prev) => ({
                   ...prev,
                   acceptTerms: e.target.checked,
