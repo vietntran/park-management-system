@@ -63,7 +63,7 @@ export async function POST(req: Request) {
 
       return NextResponse.json(
         { error: "Too many requests. Please try again later." },
-        { status: HTTP_STATUS.TOO_MANY_REQUESTS }
+        { status: HTTP_STATUS.TOO_MANY_REQUESTS },
       );
     }
 
@@ -87,7 +87,7 @@ export async function POST(req: Request) {
 
       return NextResponse.json(
         { error: "Missing required fields" },
-        { status: HTTP_STATUS.BAD_REQUEST }
+        { status: HTTP_STATUS.BAD_REQUEST },
       );
     }
 
@@ -103,7 +103,7 @@ export async function POST(req: Request) {
 
       return NextResponse.json(
         { error: "Password does not meet complexity requirements" },
-        { status: HTTP_STATUS.BAD_REQUEST }
+        { status: HTTP_STATUS.BAD_REQUEST },
       );
     }
 
@@ -121,7 +121,7 @@ export async function POST(req: Request) {
 
       return NextResponse.json(
         { error: "User already exists" },
-        { status: HTTP_STATUS.BAD_REQUEST }
+        { status: HTTP_STATUS.BAD_REQUEST },
       );
     }
 
@@ -135,7 +135,7 @@ export async function POST(req: Request) {
         name,
         phone,
         password: hashedPassword,
-        address: false,
+        address: undefined,
         phoneVerified: false,
       },
     });
@@ -154,7 +154,7 @@ export async function POST(req: Request) {
           name: user.name,
         },
       },
-      { status: HTTP_STATUS.CREATED }
+      { status: HTTP_STATUS.CREATED },
     );
   } catch (err) {
     const error = err as ErrorWithCode;
@@ -169,7 +169,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: HTTP_STATUS.INTERNAL_SERVER }
+      { status: HTTP_STATUS.INTERNAL_SERVER },
     );
   }
 }
