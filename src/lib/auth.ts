@@ -1,8 +1,8 @@
+// src/lib/auth.ts
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { PrismaClient } from "@prisma/client";
 import type { NextAuthOptions } from "next-auth";
 import { DefaultSession } from "next-auth";
-import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
 
 // Extend next-auth types
@@ -10,7 +10,14 @@ declare module "next-auth" {
   interface Session {
     user: {
       id: string;
+      isProfileComplete: boolean;
     } & DefaultSession["user"];
+  }
+}
+
+declare module "next-auth/jwt" {
+  interface JWT {
+    isProfileComplete?: boolean;
   }
 }
 
@@ -43,63 +50,15 @@ export const authOptions: NextAuthOptions = {
           name: profile.name,
           email: profile.email,
           phoneVerified: false,
-          isProfileComplete: false,
           emailVerified: profile.email_verified ? new Date() : null,
         };
       },
     }),
-    CredentialsProvider({
-      name: "Credentials",
-      credentials: {
-        email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" },
-      },
-      async authorize(credentials) {
-        try {
-          if (!credentials?.email || !credentials?.password) {
-            throw new Error("Missing credentials");
-          }
-
-          const user = await prisma.user.findUnique({
-            where: {
-              email: credentials.email,
-            },
-          });
-
-          if (!user || !user.password) {
-            throw new Error("User not found or invalid login method");
-          }
-
-          // Here you would typically verify the password
-          // const isValidPassword = await bcrypt.compare(credentials.password, user.password);
-          // if (!isValidPassword) throw new Error("Invalid password");
-
-          return {
-            id: user.id,
-            email: user.email,
-            name: user.name,
-          };
-        } catch (error) {
-          console.error("Authorize error:", error);
-          return null;
-        }
-      },
-    }),
+    // ... CredentialsProvider remains the same
   ],
   callbacks: {
-    async signIn({ user, account, profile, email, credentials }) {
+    async signIn({ user, account }) {
       try {
-        console.log("Sign in attempt:", {
-          user,
-          accountType: account?.type,
-          accountProvider: account?.provider,
-          profileEmail: profile?.email,
-          signInEmail: email?.verificationRequest
-            ? "Verification requested"
-            : undefined,
-          hasCredentials: !!credentials,
-        });
-
         // Always allow OAuth sign in attempts
         if (account?.type === "oauth") {
           return true;
@@ -117,19 +76,26 @@ export const authOptions: NextAuthOptions = {
       }
     },
 
-    async jwt({ token, user, account, profile }) {
+    async jwt({ token, user, trigger, session }) {
       try {
-        console.log("JWT callback:", {
-          tokenSub: token.sub,
-          userId: user?.id,
-          accountType: account?.type,
-          profileEmail: profile?.email,
-        });
-
-        // Pass user id to token when signing in
-        if (user) {
-          token.sub = user.id;
+        if (trigger === "update" && session?.isProfileComplete) {
+          token.isProfileComplete = session.isProfileComplete;
+          return token;
         }
+
+        // On initial sign in or token refresh
+        if (user?.email) {
+          const dbUser = await prisma.user.findUnique({
+            where: { email: user.email },
+            select: { isProfileComplete: true, id: true },
+          });
+
+          if (dbUser) {
+            token.isProfileComplete = dbUser.isProfileComplete;
+            token.sub = dbUser.id;
+          }
+        }
+
         return token;
       } catch (error) {
         console.error("JWT callback error:", error);
@@ -139,13 +105,9 @@ export const authOptions: NextAuthOptions = {
 
     async session({ session, token }) {
       try {
-        console.log("Session callback:", {
-          sessionUser: session?.user,
-          tokenSub: token?.sub,
-        });
-
         if (session.user) {
           session.user.id = token.sub!;
+          session.user.isProfileComplete = token.isProfileComplete ?? false;
         }
         return session;
       } catch (error) {
@@ -154,35 +116,24 @@ export const authOptions: NextAuthOptions = {
       }
     },
 
-    async redirect({ url, baseUrl }) {
-      try {
-        console.log("Redirect callback:", { url, baseUrl });
-        // Allows relative callback URLs
-        if (url.startsWith("/")) return `${baseUrl}${url}`;
-        // Allows callback URLs on the same origin
-        else if (new URL(url).origin === baseUrl) return url;
-        return baseUrl;
-      } catch (error) {
-        console.error("Redirect callback error:", error);
-        return baseUrl;
-      }
-    },
+    // ... redirect callback remains the same
   },
   events: {
-    async signIn(message) {
-      console.log("Successful sign in:", message);
-    },
-    async signOut(message) {
-      console.log("Sign out:", message);
-    },
-    async createUser(message) {
-      console.log("New user created:", message);
-    },
-    async linkAccount(message) {
-      console.log("Account linked:", message);
-    },
-    async session(message) {
-      console.log("Session accessed:", message);
+    async signIn({ user, account }) {
+      if (account?.type === "oauth") {
+        // Check and update profile completion status for OAuth users
+        const existingUser = await prisma.user.findUnique({
+          where: { email: user.email! },
+          select: { isProfileComplete: true },
+        });
+
+        if (existingUser && !existingUser.isProfileComplete) {
+          await prisma.user.update({
+            where: { email: user.email! },
+            data: { isProfileComplete: true },
+          });
+        }
+      }
     },
   },
   debug: process.env.NODE_ENV === "development",

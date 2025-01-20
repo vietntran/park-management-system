@@ -40,8 +40,11 @@ export default function ProfileCompletionPage() {
       // Update session to reflect the changes
       await updateSession();
 
-      // Redirect to the intended destination or dashboard
-      router.push("/dashboard");
+      // Store completion timestamp in localStorage
+      localStorage.setItem("profileCompletedAt", new Date().toISOString());
+
+      // Redirect to dashboard with welcome parameter
+      router.push("/dashboard?welcome=true");
     } catch (error) {
       setError("Failed to update profile. Please try again.");
     } finally {
