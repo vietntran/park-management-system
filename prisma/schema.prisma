@@ -50,14 +50,15 @@ model VerificationToken {
 
 // Existing models with NextAuth.js integration
 model User {
-  id              String   @id @default(uuid())
+  id              String    @id @default(uuid())
   password        String?
-  email           String   @unique
-  phone           String
+  email           String    @unique
+  phone           String?
   name            String
-  emailVerified   DateTime? // Changed to DateTime? for NextAuth.js compatibility
-  phoneVerified   Boolean  @map("phone_verified")
-  createdAt       DateTime @default(now()) @map("created_at")
+  emailVerified   DateTime? @map("email_verified")
+  phoneVerified   Boolean   @default(false) @map("phone_verified")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  isProfileComplete Boolean  @default(false) @map("is_profile_complete")
 
   // Address relation
   address         Address?
@@ -76,7 +77,6 @@ model User {
   @@map("users")
 }
 
-// New Address model
 model Address {
   id        String   @id @default(uuid())
   userId    String   @unique @map("user_id")

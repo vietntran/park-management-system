@@ -1,4 +1,3 @@
-// src/app/auth/login/page.tsx
 "use client";
 
 import Link from "next/link";
@@ -67,7 +66,11 @@ export default function LoginPage() {
           </>
         }
       >
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+        <form
+          className="mt-8 space-y-6"
+          onSubmit={handleSubmit}
+          suppressHydrationWarning
+        >
           <div className="space-y-4">
             <TextField
               name="email"
@@ -77,6 +80,7 @@ export default function LoginPage() {
               required
               hideLabel
               placeholder="Email address"
+              suppressHydrationWarning
             />
 
             <TextField
@@ -87,6 +91,7 @@ export default function LoginPage() {
               required
               hideLabel
               placeholder="Password"
+              suppressHydrationWarning
             />
           </div>
 

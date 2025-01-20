@@ -4,11 +4,12 @@ import { forwardRef } from "react";
 interface TextFieldProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string;
   error?: string;
+  helpText?: string; // New prop
   hideLabel?: boolean;
 }
 
 export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(
-  ({ label, error, hideLabel, className = "", ...props }, ref) => {
+  ({ label, error, helpText, hideLabel, className = "", ...props }, ref) => {
     const id = props.id || props.name;
 
     return (
@@ -38,6 +39,11 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(
             ${className}
           `}
         />
+        {helpText && (
+          <p className="text-sm text-gray-500" id={`${id}-help`}>
+            {helpText}
+          </p>
+        )}
         {error && (
           <p className="text-sm text-red-600" id={`${id}-error`}>
             {error}
