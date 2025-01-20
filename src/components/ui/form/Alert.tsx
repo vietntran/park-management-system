@@ -1,7 +1,11 @@
 // src/components/ui/form/Alert.tsx
+import * as React from "react";
+
+import { cn } from "@/lib/utils";
+
 interface AlertProps {
   variant?: "success" | "error" | "warning" | "info";
-  title?: string;
+  className?: string;
   children: React.ReactNode;
 }
 
@@ -12,11 +16,39 @@ const alertStyles = {
   info: "bg-blue-50 text-blue-700",
 };
 
-export const Alert = ({ variant = "info", title, children }: AlertProps) => {
+export const Alert = React.forwardRef<HTMLDivElement, AlertProps>(
+  ({ variant = "info", className, children, ...props }, ref) => {
+    return (
+      <div
+        ref={ref}
+        role="alert"
+        className={cn(`rounded-md p-4 ${alertStyles[variant]}`, className)}
+        {...props}
+      >
+        {children}
+      </div>
+    );
+  },
+);
+Alert.displayName = "Alert";
+
+interface AlertDescriptionProps {
+  className?: string;
+  children: React.ReactNode;
+}
+
+export const AlertDescription = React.forwardRef<
+  HTMLParagraphElement,
+  AlertDescriptionProps
+>(({ className, children, ...props }, ref) => {
   return (
-    <div className={`rounded-md p-4 ${alertStyles[variant]}`}>
-      {title && <h3 className="text-sm font-medium mb-2">{title}</h3>}
-      <div className="text-sm">{children}</div>
+    <div
+      ref={ref}
+      className={cn("text-sm [&_p]:leading-relaxed", className)}
+      {...props}
+    >
+      {children}
     </div>
   );
-};
+});
+AlertDescription.displayName = "AlertDescription";
