@@ -1,8 +1,8 @@
 // src/app/layout.tsx
 import { Inter } from "next/font/google";
 
-import Navigation from "@/components/Navigation";
-import { Providers } from "@/components/Providers";
+import Navigation from "@/components/layout/Navigation";
+import { Providers } from "@/components/providers/Providers";
 
 const inter = Inter({ subsets: ["latin"] });
 
