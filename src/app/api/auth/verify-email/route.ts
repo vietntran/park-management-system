@@ -1,125 +1,108 @@
 import { headers } from "next/headers";
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import { getServerSession } from "next-auth";
 
+import { withErrorHandler } from "@/app/api/error";
 import { HTTP_STATUS } from "@/constants/http";
+import {
+  AuthenticationError,
+  ValidationError,
+  TokenExpiredError,
+} from "@/lib/errors/ApplicationErrors";
 import logger from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
 import { emailVerificationSchema } from "@/lib/validations/auth";
 
-interface ErrorWithCode extends Error {
-  code?: string;
+interface EmailVerificationResponse {
+  message: string;
 }
 
-export async function POST(req: Request) {
-  const requestId = crypto.randomUUID();
-  const headersList = await headers();
-  const ip = headersList.get("x-forwarded-for") || "unknown";
+export const POST = withErrorHandler<EmailVerificationResponse>(
+  async (req: NextRequest) => {
+    const requestId = crypto.randomUUID();
+    const headersList = await headers();
+    const ip = headersList.get("x-forwarded-for") || "unknown";
 
-  try {
+    // Check authentication
     const session = await getServerSession();
     if (!session?.user?.email) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: HTTP_STATUS.UNAUTHORIZED }
-      );
+      logger.warn("Unauthorized email verification attempt", {
+        requestId,
+        ip,
+      });
+      throw new AuthenticationError();
     }
 
     const body = await req.json();
-    
-    // Validate request body
+
+    // Validate request body using Zod schema
     const result = emailVerificationSchema.safeParse(body);
     if (!result.success) {
       logger.warn("Invalid email verification request", {
         requestId,
         ip,
-        errors: result.error.errors,
+        validationErrors: result.error.errors,
       });
-
-      return NextResponse.json(
-        { error: "Invalid request data" },
-        { status: HTTP_STATUS.BAD_REQUEST }
-      );
+      throw new ValidationError(result.error.errors[0].message);
     }
 
     const { token } = result.data;
 
-    // Verify token
-    const verificationToken = await prisma.verificationToken.findUnique({
-      where: {
-        token,
-      },
-    });
-
-    if (!verificationToken) {
-      logger.warn("Invalid verification token", {
-        requestId,
-        ip,
-        token,
+    // Start a transaction to handle token verification and user update
+    const verifiedUser = await prisma.$transaction(async (tx) => {
+      // Find and validate token
+      const verificationToken = await tx.verificationToken.findUnique({
+        where: { token },
       });
 
-      return NextResponse.json(
-        { error: "Invalid verification token" },
-        { status: HTTP_STATUS.BAD_REQUEST }
-      );
-    }
+      if (!verificationToken) {
+        logger.warn("Invalid verification token", {
+          requestId,
+          ip,
+          token,
+        });
+        throw new ValidationError("Invalid verification token");
+      }
 
-    // Check if token is expired
-    if (new Date() > verificationToken.expires) {
-      logger.warn("Expired verification token", {
-        requestId,
-        ip,
-        token,
-        expiredAt: verificationToken.expires,
+      // Check token expiration
+      if (new Date() > verificationToken.expires) {
+        logger.warn("Expired verification token", {
+          requestId,
+          ip,
+          token,
+          expiredAt: verificationToken.expires,
+        });
+        throw new TokenExpiredError("Verification token has expired");
+      }
+
+      // Update user email verification status
+      const updatedUser = await tx.user.update({
+        where: {
+          email: verificationToken.identifier,
+        },
+        data: {
+          emailVerified: new Date(),
+        },
       });
 
-      return NextResponse.json(
-        { error: "Verification token has expired" },
-        { status: HTTP_STATUS.BAD_REQUEST }
-      );
-    }
+      // Delete used token
+      await tx.verificationToken.delete({
+        where: { token },
+      });
 
-    // Update user email verification status
-    await prisma.user.update({
-      where: {
-        email: verificationToken.identifier,
-      },
-      data: {
-        emailVerified: new Date(),
-      },
-    });
-
-    // Delete used token
-    await prisma.verificationToken.delete({
-      where: {
-        token,
-      },
+      return updatedUser;
     });
 
     logger.info("Email verified successfully", {
       requestId,
       ip,
-      email: verificationToken.identifier,
+      userId: verifiedUser.id,
+      email: verifiedUser.email,
     });
 
     return NextResponse.json(
       { message: "Email verified successfully" },
-      { status: HTTP_STATUS.OK }
+      { status: HTTP_STATUS.OK },
     );
-  } catch (err) {
-    const error = err as ErrorWithCode;
-
-    logger.error("Email verification error", {
-      requestId,
-      ip,
-      errorName: error.name,
-      errorCode: error.code,
-      stack: error.stack,
-    });
-
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: HTTP_STATUS.INTERNAL_SERVER }
-    );
-  }
-}
+  },
+);

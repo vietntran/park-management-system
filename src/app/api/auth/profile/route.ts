@@ -1,116 +1,129 @@
 import { Prisma } from "@prisma/client";
 import { headers } from "next/headers";
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import { getServerSession } from "next-auth";
 
+import { withErrorHandler } from "@/app/api/error";
 import { HTTP_STATUS } from "@/constants/http";
+import {
+  AuthenticationError,
+  ValidationError,
+  NotFoundError,
+} from "@/lib/errors/ApplicationErrors";
 import logger from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
 import { profileUpdateSchema } from "@/lib/validations/auth";
 
-interface ErrorWithCode extends Error {
-  code?: string;
+// Response types for better type safety
+interface UserProfile {
+  id: string;
+  email: string;
+  name: string;
+  phone: string | null;
+  address: {
+    id: string;
+    line1: string;
+    line2: string | null;
+    city: string;
+    state: string;
+    zipCode: string;
+  } | null;
+  emailVerified: Date | null;
+  phoneVerified: boolean;
 }
 
-export async function GET() {
+export const GET = withErrorHandler<UserProfile>(async () => {
   const requestId = crypto.randomUUID();
   const headersList = await headers();
   const ip = headersList.get("x-forwarded-for") || "unknown";
 
-  try {
-    const session = await getServerSession();
-    if (!session?.user?.email) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: HTTP_STATUS.UNAUTHORIZED }
-      );
-    }
-
-    const user = await prisma.user.findUnique({
-      where: {
-        email: session.user.email,
-      },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        phone: true,
-        address: true,
-        emailVerified: true,
-        phoneVerified: true,
-      },
-    });
-
-    if (!user) {
-      logger.warn("User not found", {
-        requestId,
-        ip,
-        email: session.user.email,
-      });
-
-      return NextResponse.json(
-        { error: "User not found" },
-        { status: HTTP_STATUS.NOT_FOUND }
-      );
-    }
-
-    return NextResponse.json(user, { status: HTTP_STATUS.OK });
-  } catch (err) {
-    const error = err as ErrorWithCode;
-
-    logger.error("Profile fetch error", {
+  const session = await getServerSession();
+  if (!session?.user?.email) {
+    logger.warn("Unauthorized profile access attempt", {
       requestId,
       ip,
-      errorName: error.name,
-      errorCode: error.code,
-      stack: error.stack,
     });
-
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: HTTP_STATUS.INTERNAL_SERVER }
-    );
+    throw new AuthenticationError();
   }
-}
 
-export async function PUT(req: Request) {
+  const user = await prisma.user.findUnique({
+    where: {
+      email: session.user.email,
+    },
+    select: {
+      id: true,
+      email: true,
+      name: true,
+      phone: true,
+      address: true,
+      emailVerified: true,
+      phoneVerified: true,
+    },
+  });
+
+  if (!user) {
+    logger.warn("User not found during profile fetch", {
+      requestId,
+      ip,
+      email: session.user.email,
+    });
+    throw new NotFoundError("User not found");
+  }
+
+  logger.info("Profile fetched successfully", {
+    requestId,
+    ip,
+    userId: user.id,
+  });
+
+  return NextResponse.json(user, { status: HTTP_STATUS.OK });
+});
+
+export const PUT = withErrorHandler<UserProfile>(async (req: NextRequest) => {
   const requestId = crypto.randomUUID();
   const headersList = await headers();
   const ip = headersList.get("x-forwarded-for") || "unknown";
 
+  const session = await getServerSession();
+  if (!session?.user?.email) {
+    logger.warn("Unauthorized profile update attempt", {
+      requestId,
+      ip,
+    });
+    throw new AuthenticationError();
+  }
+
+  const body = await req.json();
+
+  // Use Zod schema for validation
+  const result = profileUpdateSchema.safeParse(body);
+  if (!result.success) {
+    logger.warn("Invalid profile update data", {
+      requestId,
+      ip,
+      validationErrors: result.error.errors,
+    });
+    throw new ValidationError(result.error.errors[0].message);
+  }
+
+  // Transform the validated data to match Prisma's expected format
+  const updateData: Prisma.UserUpdateInput = {
+    email: result.data.email,
+    name: result.data.name,
+    phone: result.data.phone,
+    ...(result.data.address
+      ? {
+          address: {
+            upsert: {
+              create: result.data.address,
+              update: result.data.address,
+            },
+          },
+        }
+      : {}),
+  };
+
   try {
-    const session = await getServerSession();
-    if (!session?.user?.email) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: HTTP_STATUS.UNAUTHORIZED }
-      );
-    }
-
-    const body = await req.json();
-
-    // Validate request body
-    const result = profileUpdateSchema.safeParse(body);
-    if (!result.success) {
-      logger.warn("Invalid profile update data", {
-        requestId,
-        ip,
-        errors: result.error.errors,
-      });
-
-      return NextResponse.json(
-        { error: "Invalid request data" },
-        { status: HTTP_STATUS.BAD_REQUEST }
-      );
-    }
-
-    // Transform the validated data to match Prisma's expected format
-    const updateData: Prisma.UserUpdateInput = {
-      email: result.data.email,
-      name: result.data.name,
-      phone: result.data.phone,
-    };
-
     const updatedUser = await prisma.user.update({
       where: {
         email: session.user.email,
@@ -134,20 +147,18 @@ export async function PUT(req: Request) {
     });
 
     return NextResponse.json(updatedUser, { status: HTTP_STATUS.OK });
-  } catch (err) {
-    const error = err as ErrorWithCode;
-
+  } catch (error) {
     logger.error("Profile update error", {
       requestId,
       ip,
-      errorName: error.name,
-      errorCode: error.code,
-      stack: error.stack,
+      error,
     });
 
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: HTTP_STATUS.INTERNAL_SERVER }
-    );
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === "P2002") {
+        throw new ValidationError("Email already in use");
+      }
+    }
+    throw error;
   }
-}
+});

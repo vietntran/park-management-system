@@ -37,3 +37,9 @@ export class TooManyRequestsError extends BaseError {
     super(message, HTTP_STATUS.TOO_MANY_REQUESTS);
   }
 }
+
+export class TokenExpiredError extends BaseError {
+  constructor(message: string = "Token has expired") {
+    super(message, HTTP_STATUS.UNAUTHORIZED);
+  }
+}
