@@ -51,14 +51,12 @@ export const ReservationForm = () => {
     },
   });
 
-  // Load available dates on component mount
   useEffect(() => {
     loadAvailableDates();
   }, []);
 
   const loadAvailableDates = async () => {
     try {
-      // Get the next 30 days availability
       const startDate = new Date();
       const endDate = addDays(startDate, 30);
       const response = await fetch(
@@ -82,7 +80,6 @@ export const ReservationForm = () => {
     setError("");
 
     try {
-      // Check date availability first
       const availabilityResponse = await fetch(
         `/api/reservations/check-availability?date=${data.reservationDate.toISOString()}`,
       );
@@ -97,7 +94,6 @@ export const ReservationForm = () => {
         return;
       }
 
-      // Create the reservation
       const response = await fetch("/api/reservations/create", {
         method: "POST",
         headers: {
@@ -112,8 +108,7 @@ export const ReservationForm = () => {
       }
 
       // Handle successful reservation (e.g., redirect to confirmation page)
-      //   const reservation = await response.json();
-      // You can add navigation here using Next.js router
+      // const reservation = await response.json();
       // router.push(`/reservations/${reservation.id}`);
     } catch (err) {
       console.error("Error creating reservation:", err);
@@ -154,9 +149,7 @@ export const ReservationForm = () => {
                 selected={selectedDate}
                 onSelect={(date) => date && setValue("reservationDate", date)}
                 disabled={(date) => {
-                  // Disable past dates
                   if (date < new Date()) return true;
-                  // Disable dates that aren't in the availableDates array
                   return !availableDates.some(
                     (availableDate) =>
                       availableDate.toDateString() === date.toDateString(),
