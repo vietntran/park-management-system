@@ -1,12 +1,11 @@
-// src/components/dashboard/DashboardContent.tsx
 "use client";
 
 import { Calendar, User, BookOpen } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/Alert";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Alert } from "@/components/ui/form/Alert";
-import { Button } from "@/components/ui/form/Button";
 import { useUserStatus } from "@/providers/UserStatusProvider";
 
 import { ReservationsList } from "./ReservationsList";
@@ -19,9 +18,12 @@ export function DashboardContent() {
   return (
     <div className="max-w-7xl mx-auto p-6 space-y-6">
       {showWelcome && (
-        <Alert variant="success" title="Welcome to the Park Management System!">
-          Your profile is complete. You can now make reservations for up to 4
-          people across 3 consecutive days.
+        <Alert variant="success">
+          <AlertTitle>Welcome to the Park Management System!</AlertTitle>
+          <AlertDescription>
+            Your profile is complete. You can now make reservations for up to 4
+            people across 3 consecutive days.
+          </AlertDescription>
         </Alert>
       )}
 
@@ -77,13 +79,16 @@ export function DashboardContent() {
       </div>
 
       {/* System Rules */}
-      <Alert variant="warning" title="Reservation Rules">
-        <ul className="list-disc list-inside space-y-1">
-          <li>Maximum of 60 total reservations per day</li>
-          <li>You can book for up to 4 people per reservation</li>
-          <li>Reservations limited to 3 consecutive days</li>
-          <li>All guests must be registered in the system</li>
-        </ul>
+      <Alert variant="warning">
+        <AlertTitle>Reservation Rules</AlertTitle>
+        <AlertDescription>
+          <ul className="list-disc list-inside space-y-1">
+            <li>Maximum of 60 total reservations per day</li>
+            <li>You can book for up to 4 people per reservation</li>
+            <li>Reservations limited to 3 consecutive days</li>
+            <li>All guests must be registered in the system</li>
+          </ul>
+        </AlertDescription>
       </Alert>
     </div>
   );

@@ -7,10 +7,10 @@ import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
+import { Alert, AlertDescription } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar/Calendar";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/form/Alert";
 import type { ReservationFormData, SelectedUser } from "@/types/reservation";
 
 import { UserSearch } from "./UserSearch";

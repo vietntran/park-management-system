@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useState } from "react";
 
-import { Alert } from "@/components/ui/form/Alert";
+import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/form/Button";
 import { FormContainer } from "@/components/ui/form/FormContainer";
 import { TextField } from "@/components/ui/form/TextField";
