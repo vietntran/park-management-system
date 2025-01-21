@@ -1,21 +1,59 @@
 import { startOfDay } from "date-fns";
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import { getServerSession } from "next-auth";
 
+import { withErrorHandler } from "@/app/api/error";
+import { HTTP_STATUS } from "@/constants/http";
 import { authOptions } from "@/lib/auth";
+import {
+  AuthenticationError,
+  ValidationError,
+  ConflictError,
+} from "@/lib/errors/ApplicationErrors";
+import logger from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
 import { SelectedUser } from "@/types/reservation";
 
-export async function POST(request: Request) {
-  try {
+// Define response type for the reservation
+interface ReservationUser {
+  userId: string;
+  isPrimary: boolean;
+  canModify: boolean;
+  canTransfer: boolean;
+  user: {
+    name: string;
+    email: string;
+  };
+}
+
+interface ReservationResponse {
+  id: string;
+  primaryUserId: string;
+  reservationDate: Date;
+  reservationUsers: ReservationUser[];
+}
+
+// Define request type for better type safety
+interface CreateReservationRequest {
+  reservationDate: string;
+  additionalUsers?: SelectedUser[];
+}
+
+export const POST = withErrorHandler<ReservationResponse>(
+  async (req: NextRequest) => {
     const session = await getServerSession(authOptions);
 
     if (!session?.user?.id) {
-      return new NextResponse("Unauthorized", { status: 401 });
+      throw new AuthenticationError();
     }
 
-    const json = await request.json();
-    const { reservationDate, additionalUsers } = json;
+    const json = await req.json();
+    const { reservationDate, additionalUsers } =
+      json as CreateReservationRequest;
+
+    if (!reservationDate) {
+      throw new ValidationError("Reservation date is required");
+    }
 
     // Start a transaction
     const reservation = await prisma.$transaction(async (tx) => {
@@ -36,7 +74,7 @@ export async function POST(request: Request) {
       } else {
         // Check if capacity is full
         if (dateCapacity.totalBookings >= dateCapacity.maxCapacity) {
-          throw new Error("No available spots for this date");
+          throw new ConflictError("No available spots for this date");
         }
 
         dateCapacity = await tx.dateCapacity.update({
@@ -64,8 +102,8 @@ export async function POST(request: Request) {
               },
               ...(additionalUsers?.map((user: SelectedUser) => ({
                 userId: user.id,
-                canModify: user.canModify || false,
-                canTransfer: user.canTransfer || false,
+                canModify: user.canModify ?? false,
+                canTransfer: user.canTransfer ?? false,
               })) || []),
             ],
           },
@@ -84,15 +122,15 @@ export async function POST(request: Request) {
         },
       });
 
+      logger.info("Reservation created successfully", {
+        reservationId: newReservation.id,
+        userId: session.user.id,
+        date: date,
+      });
+
       return newReservation;
     });
 
-    return NextResponse.json(reservation);
-  } catch (error) {
-    console.error("Error creating reservation:", error);
-    if (error instanceof Error) {
-      return new NextResponse(error.message, { status: 400 });
-    }
-    return new NextResponse("Internal Server Error", { status: 500 });
-  }
-}
+    return NextResponse.json(reservation, { status: HTTP_STATUS.CREATED });
+  },
+);

@@ -1,16 +1,17 @@
 import { hash } from "bcryptjs";
 import { headers } from "next/headers";
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 
+import { withErrorHandler } from "@/app/api/error";
 import { HTTP_STATUS } from "@/constants/http";
+import {
+  ValidationError,
+  TooManyRequestsError,
+  ConflictError,
+} from "@/lib/errors/ApplicationErrors";
 import logger from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
 import { registerSchema } from "@/lib/validations/auth";
-
-// Define error type for better error handling
-interface ErrorWithCode extends Error {
-  code?: string;
-}
 
 // Rate limiting types
 interface RateLimitInfo {
@@ -18,10 +19,19 @@ interface RateLimitInfo {
   timestamp: number;
 }
 
+// Response type for registration
+interface RegistrationResponse {
+  user: {
+    id: string;
+    email: string;
+    name: string;
+  };
+}
+
 const RATE_LIMIT = {
   MAX_REQUESTS: 5,
   WINDOW_MS: 60 * 1000, // 1 minute
-};
+} as const;
 
 // Simple in-memory rate limiting (consider using Redis for production)
 const rateLimiter = new Map<string, RateLimitInfo>();
@@ -45,12 +55,12 @@ function getRateLimitInfo(ip: string): RateLimitInfo {
   return current;
 }
 
-export async function POST(req: Request) {
-  const requestId = crypto.randomUUID();
-  const headersList = await headers();
-  const ip = headersList.get("x-forwarded-for") || "unknown";
+export const POST = withErrorHandler<RegistrationResponse>(
+  async (req: NextRequest) => {
+    const requestId = crypto.randomUUID();
+    const headersList = await headers();
+    const ip = headersList.get("x-forwarded-for") || "unknown";
 
-  try {
     // Rate limiting check
     const rateLimitInfo = getRateLimitInfo(ip);
 
@@ -62,9 +72,8 @@ export async function POST(req: Request) {
         rateLimitInfo,
       });
 
-      return NextResponse.json(
-        { error: "Too many requests. Please try again later." },
-        { status: HTTP_STATUS.TOO_MANY_REQUESTS },
+      throw new TooManyRequestsError(
+        "Too many requests. Please try again later.",
       );
     }
 
@@ -83,10 +92,7 @@ export async function POST(req: Request) {
         validationErrors: result.error.errors,
       });
 
-      return NextResponse.json(
-        { error: result.error.errors[0].message },
-        { status: HTTP_STATUS.BAD_REQUEST },
-      );
+      throw new ValidationError(result.error.errors[0].message);
     }
 
     const { email, password, name, phone, address } = result.data;
@@ -103,10 +109,7 @@ export async function POST(req: Request) {
         email,
       });
 
-      return NextResponse.json(
-        { error: "User already exists" },
-        { status: HTTP_STATUS.BAD_REQUEST },
-      );
+      throw new ConflictError("User already exists");
     }
 
     // Hash password
@@ -150,20 +153,5 @@ export async function POST(req: Request) {
       },
       { status: HTTP_STATUS.CREATED },
     );
-  } catch (err) {
-    const error = err as ErrorWithCode;
-
-    logger.error("Registration error", {
-      requestId,
-      ip,
-      errorName: error.name,
-      errorCode: error.code,
-      stack: error.stack,
-    });
-
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: HTTP_STATUS.INTERNAL_SERVER },
-    );
-  }
-}
+  },
+);
