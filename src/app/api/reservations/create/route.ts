@@ -12,6 +12,7 @@ import {
 } from "@/lib/errors/ApplicationErrors";
 import logger from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
+import { validateConsecutiveDates } from "@/lib/validations/reservation";
 import { SelectedUser } from "@/types/reservation";
 
 // Define response type for the reservation
@@ -55,10 +56,21 @@ export const POST = withErrorHandler<ReservationResponse>(
       throw new ValidationError("Reservation date is required");
     }
 
+    const date = startOfDay(new Date(reservationDate));
+
+    // Validate consecutive dates for primary user
+    await validateConsecutiveDates(session.user.id, date);
+
+    // Also validate consecutive dates for additional users
+    if (additionalUsers?.length) {
+      for (const user of additionalUsers) {
+        await validateConsecutiveDates(user.id, date);
+      }
+    }
+
     // Start a transaction
     const reservation = await prisma.$transaction(async (tx) => {
       // Check date capacity first
-      const date = startOfDay(new Date(reservationDate));
       let dateCapacity = await tx.dateCapacity.findUnique({
         where: { date },
       });
