@@ -1,36 +1,43 @@
 "use client";
 
+import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { useState } from "react";
+import { useForm } from "react-hook-form";
 
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/form/Button";
 import { FormContainer } from "@/components/ui/form/FormContainer";
 import { TextField } from "@/components/ui/form/TextField";
+import { loginSchema } from "@/lib/validations/auth";
+import { LoginError, LoginFormData } from "@/types/auth";
 
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const from = searchParams.get("from") || "/dashboard";
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<LoginError>(null);
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<LoginFormData>({
+    resolver: zodResolver(loginSchema),
+  });
+
+  const onSubmit = async (data: LoginFormData) => {
     setLoading(true);
     setError(null);
-
-    const formData = new FormData(e.currentTarget);
-    const email = formData.get("email") as string;
-    const password = formData.get("password") as string;
 
     try {
       const result = await signIn("credentials", {
         redirect: false,
-        email,
-        password,
+        email: data.email,
+        password: data.password,
       });
 
       if (result?.error) {
@@ -68,29 +75,31 @@ export default function LoginPage() {
       >
         <form
           className="mt-8 space-y-6"
-          onSubmit={handleSubmit}
+          onSubmit={handleSubmit(onSubmit)}
           suppressHydrationWarning
         >
           <div className="space-y-4">
             <TextField
-              name="email"
+              {...register("email")}
               type="email"
               label="Email address"
               autoComplete="email"
               required
               hideLabel
               placeholder="Email address"
+              error={errors.email?.message}
               suppressHydrationWarning
             />
 
             <TextField
-              name="password"
+              {...register("password")}
               type="password"
               label="Password"
               autoComplete="current-password"
               required
               hideLabel
               placeholder="Password"
+              error={errors.password?.message}
               suppressHydrationWarning
             />
           </div>

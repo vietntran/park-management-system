@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { HTTP_STATUS } from "@/constants/http";
 import logger from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
+import { registerSchema } from "@/lib/validations/auth";
 
 // Define error type for better error handling
 interface ErrorWithCode extends Error {
@@ -50,7 +51,7 @@ export async function POST(req: Request) {
   const ip = headersList.get("x-forwarded-for") || "unknown";
 
   try {
-    // Rate limiting
+    // Rate limiting check
     const rateLimitInfo = getRateLimitInfo(ip);
 
     if (rateLimitInfo.count >= RATE_LIMIT.MAX_REQUESTS) {
@@ -70,42 +71,25 @@ export async function POST(req: Request) {
     rateLimitInfo.count += 1;
     rateLimiter.set(ip, rateLimitInfo);
 
-    const { email, password, name, phone } = await req.json();
+    const data = await req.json();
 
-    // Input validation
-    if (!email || !password || !name || !phone) {
-      logger.warn("Missing required fields in registration attempt", {
+    // Use Zod schema for validation
+    const result = registerSchema.safeParse(data);
+
+    if (!result.success) {
+      logger.warn("Invalid registration data", {
         requestId,
         ip,
-        missingFields: {
-          email: !email,
-          password: !password,
-          name: !name,
-          phone: !phone,
-        },
+        validationErrors: result.error.errors,
       });
 
       return NextResponse.json(
-        { error: "Missing required fields" },
+        { error: result.error.errors[0].message },
         { status: HTTP_STATUS.BAD_REQUEST },
       );
     }
 
-    // Check password complexity
-    const passwordRegex =
-      /^(?=.*[A-Z])(?=.*[a-z])(?=.*[0-9])(?=.*[!@#$%^&*(),.?":{}|<>]).{12,128}$/;
-    if (!passwordRegex.test(password)) {
-      logger.warn("Password complexity requirements not met", {
-        requestId,
-        ip,
-        email,
-      });
-
-      return NextResponse.json(
-        { error: "Password does not meet complexity requirements" },
-        { status: HTTP_STATUS.BAD_REQUEST },
-      );
-    }
+    const { email, password, name, phone, address } = result.data;
 
     // Check if user already exists
     const existingUser = await prisma.user.findUnique({
@@ -135,7 +119,17 @@ export async function POST(req: Request) {
         name,
         phone,
         password: hashedPassword,
-        address: undefined,
+        address: address
+          ? {
+              create: {
+                line1: address.line1,
+                line2: address.line2,
+                city: address.city,
+                state: address.state,
+                zipCode: address.zipCode,
+              },
+            }
+          : undefined,
         phoneVerified: false,
       },
     });

@@ -3,8 +3,9 @@ import { useRouter } from "next/navigation";
 import React, { useState } from "react";
 
 import AddressForm from "@/components/forms/AddressForm";
-import { registerSchema, type RegisterFormData } from "@/lib/validations/auth";
+import { registerSchema } from "@/lib/validations/auth";
 import type { Address, PartialAddress } from "@/types/address";
+import { type RegisterFormData } from "@/types/auth";
 
 type FormData = Omit<RegisterFormData, "address"> & {
   address?: PartialAddress;
@@ -229,7 +230,7 @@ export default function RegisterForm() {
 
           {showAddress && (
             <AddressForm
-              address={formData.address}
+              address={formData.address ?? null}
               onChange={handleAddressChange}
             />
           )}

@@ -24,7 +24,7 @@ export interface AddressInput {
 export type PartialAddress = Partial<Address>;
 
 export interface AddressFormProps {
-  address: Address | null;
+  address: Partial<Address> | null;
   onChange: (field: keyof AddressInput, value: string) => void;
   className?: string;
 }

@@ -1,9 +1,13 @@
 // src/lib/auth.ts
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { PrismaClient } from "@prisma/client";
+import bcrypt from "bcryptjs";
 import type { NextAuthOptions } from "next-auth";
 import { DefaultSession } from "next-auth";
+import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
+
+import { loginSchema } from "@/lib/validations/auth";
 
 // Extend next-auth types
 declare module "next-auth" {
@@ -54,7 +58,49 @@ export const authOptions: NextAuthOptions = {
         };
       },
     }),
-    // ... CredentialsProvider remains the same
+    CredentialsProvider({
+      name: "credentials",
+      credentials: {
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" },
+      },
+      async authorize(credentials) {
+        try {
+          const result = loginSchema.safeParse(credentials);
+
+          if (!result.success) {
+            return null;
+          }
+
+          const { email, password } = result.data;
+
+          const user = await prisma.user.findUnique({
+            where: { email },
+          });
+
+          if (!user || !user.password) {
+            return null;
+          }
+
+          const passwordMatch = await bcrypt.compare(password, user.password);
+
+          if (!passwordMatch) {
+            return null;
+          }
+
+          return {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            emailVerified: user.emailVerified,
+            phoneVerified: user.phoneVerified,
+          };
+        } catch (error) {
+          console.error("Authorization error:", error);
+          return null;
+        }
+      },
+    }),
   ],
   callbacks: {
     async signIn({ user, account }) {
