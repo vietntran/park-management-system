@@ -7,6 +7,7 @@ import { DefaultSession } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
 
+import logger from "@/lib/logger";
 import { loginSchema } from "@/lib/validations/auth";
 
 // Extend next-auth types
@@ -69,6 +70,9 @@ export const authOptions: NextAuthOptions = {
           const result = loginSchema.safeParse(credentials);
 
           if (!result.success) {
+            logger.warn("Invalid credentials format", {
+              error: result.error,
+            });
             return null;
           }
 
@@ -79,12 +83,18 @@ export const authOptions: NextAuthOptions = {
           });
 
           if (!user || !user.password) {
+            logger.warn("User not found or no password set", {
+              email,
+            });
             return null;
           }
 
           const passwordMatch = await bcrypt.compare(password, user.password);
 
           if (!passwordMatch) {
+            logger.warn("Password mismatch", {
+              email,
+            });
             return null;
           }
 
@@ -96,7 +106,9 @@ export const authOptions: NextAuthOptions = {
             phoneVerified: user.phoneVerified,
           };
         } catch (error) {
-          console.error("Authorization error:", error);
+          logger.error("Authorization error:", {
+            error: error instanceof Error ? error : new Error(String(error)),
+          });
           return null;
         }
       },
@@ -105,6 +117,12 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async signIn({ user, account }) {
       try {
+        logger.info("Sign in attempt", {
+          userId: user.id,
+          provider: account?.provider,
+          type: account?.type,
+        });
+
         // Always allow OAuth sign in attempts
         if (account?.type === "oauth") {
           return true;
@@ -117,7 +135,11 @@ export const authOptions: NextAuthOptions = {
 
         return false; // Deny unknown sign in types
       } catch (error) {
-        console.error("Sign in callback error:", error);
+        logger.error("Sign in callback error:", {
+          error: error instanceof Error ? error : new Error(String(error)),
+          userId: user.id,
+          provider: account?.provider,
+        });
         return false;
       }
     },
@@ -144,7 +166,10 @@ export const authOptions: NextAuthOptions = {
 
         return token;
       } catch (error) {
-        console.error("JWT callback error:", error);
+        logger.error("JWT callback error:", {
+          error: error instanceof Error ? error : new Error(String(error)),
+          email: user?.email,
+        });
         return token;
       }
     },
@@ -157,29 +182,48 @@ export const authOptions: NextAuthOptions = {
         }
         return session;
       } catch (error) {
-        console.error("Session callback error:", error);
+        logger.error("Session callback error:", {
+          error: error instanceof Error ? error : new Error(String(error)),
+          userId: token.sub,
+        });
         return session;
       }
     },
-
-    // ... redirect callback remains the same
   },
   events: {
     async signIn({ user, account }) {
       if (account?.type === "oauth") {
-        // Check and update profile completion status for OAuth users
-        const existingUser = await prisma.user.findUnique({
-          where: { email: user.email! },
-          select: { isProfileComplete: true },
-        });
-
-        if (existingUser && !existingUser.isProfileComplete) {
-          await prisma.user.update({
+        try {
+          // Check and update profile completion status for OAuth users
+          const existingUser = await prisma.user.findUnique({
             where: { email: user.email! },
-            data: { isProfileComplete: true },
+            select: { isProfileComplete: true },
+          });
+
+          if (existingUser && !existingUser.isProfileComplete) {
+            await prisma.user.update({
+              where: { email: user.email! },
+              data: { isProfileComplete: true },
+            });
+
+            logger.info("Updated user profile completion status", {
+              userId: user.id,
+              email: user.email,
+            });
+          }
+        } catch (error) {
+          logger.error("Error updating profile completion status:", {
+            error: error instanceof Error ? error : new Error(String(error)),
+            userId: user.id,
+            email: user.email,
           });
         }
       }
+    },
+    async signOut({ session }) {
+      logger.info("User signed out", {
+        userId: session?.user?.id,
+      });
     },
   },
   debug: process.env.NODE_ENV === "development",
