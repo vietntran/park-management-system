@@ -32,7 +32,7 @@ export function logError(error: Error, context?: ExtendedLogContext) {
 }
 
 // Main error handler for API routes (includes logging and response formatting)
-export function handleError(
+export function handleServerError(
   error: unknown,
   context?: ExtendedLogContext,
 ): NextResponse<ErrorResponse> {

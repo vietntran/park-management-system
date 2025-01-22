@@ -2,7 +2,7 @@ import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 
-import { withErrorHandler } from "@/app/api/error/route";
+import { withErrorHandler } from "@/lib/api/withErrorHandler";
 import { authOptions } from "@/lib/auth";
 import {
   AuthenticationError,

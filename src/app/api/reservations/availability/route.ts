@@ -2,8 +2,8 @@ import { addDays, startOfDay } from "date-fns";
 import { headers } from "next/headers";
 import { NextResponse, NextRequest } from "next/server";
 
-import { withErrorHandler } from "@/app/api/error";
 import { HTTP_STATUS } from "@/constants/http";
+import { withErrorHandler } from "@/lib/api/withErrorHandler";
 import { ValidationError } from "@/lib/errors/ApplicationErrors";
 import logger from "@/lib/logger";
 import { prisma } from "@/lib/prisma";

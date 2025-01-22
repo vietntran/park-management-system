@@ -1,7 +1,7 @@
 import NextAuth from "next-auth/next";
 
-import { withErrorHandler } from "@/app/api/error/route";
 import { HTTP_STATUS } from "@/constants/http";
+import { withErrorHandler } from "@/lib/api/withErrorHandler";
 import { authOptions } from "@/lib/auth";
 import {
   AuthenticationError,
@@ -36,8 +36,12 @@ export const GET = withErrorHandler<AuthResponse>(async (req) => {
 
     return response;
   } catch (error) {
+    // Convert unknown error to Error type for logger
+    const errorInstance =
+      error instanceof Error ? error : new Error(String(error));
+
     logger.error("Authentication error", {
-      error,
+      error: errorInstance,
       method: "GET",
       path: "/api/auth/[...nextauth]",
     });
@@ -66,8 +70,12 @@ export const POST = withErrorHandler<AuthResponse>(async (req) => {
 
     return response;
   } catch (error) {
+    // Convert unknown error to Error type for logger
+    const errorInstance =
+      error instanceof Error ? error : new Error(String(error));
+
     logger.error("Authentication error", {
-      error,
+      error: errorInstance,
       method: "POST",
       path: "/api/auth/[...nextauth]",
     });

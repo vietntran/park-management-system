@@ -2,7 +2,7 @@ import { startOfDay } from "date-fns";
 import { NextResponse, NextRequest } from "next/server";
 import { getServerSession } from "next-auth";
 
-import { withErrorHandler } from "@/app/api/error/route";
+import { withErrorHandler } from "@/lib/api/withErrorHandler";
 import { authOptions } from "@/lib/auth";
 import { ValidationError, ConflictError } from "@/lib/errors/ApplicationErrors";
 import logger from "@/lib/logger";
