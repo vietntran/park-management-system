@@ -28,7 +28,12 @@ export function withErrorHandler<T>(handler: RouteHandler<T>): RouteHandler<T> {
     try {
       return await handler(req, context);
     } catch (error) {
-      return handleError(error) as NextResponse<ApiResponse<T>>;
+      // Pass request context to error handler
+      return handleError(error, {
+        path: req.url,
+        method: req.method,
+        userId: context?.params?.userId as string | undefined,
+      }) as NextResponse<ApiResponse<T>>;
     }
   };
 }

@@ -1,6 +1,6 @@
 import NextAuth from "next-auth/next";
 
-import { withErrorHandler } from "@/app/api/error";
+import { withErrorHandler } from "@/app/api/error/route";
 import { HTTP_STATUS } from "@/constants/http";
 import { authOptions } from "@/lib/auth";
 import {

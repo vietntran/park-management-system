@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 
 import { HTTP_STATUS } from "@/constants/http";
-import logger from "@/lib/logger";
+import logger, { LogContext } from "@/lib/logger";
 
 import { BaseError } from "./BaseError";
 
@@ -14,13 +14,40 @@ interface ErrorResponse {
   code?: string;
 }
 
-export function handleError(error: unknown): NextResponse<ErrorResponse> {
+type ExtendedLogContext = LogContext & {
+  additionalInfo?: Record<string, unknown>;
+};
+
+// Function for logging only (without response formatting)
+export function logError(error: Error, context?: ExtendedLogContext) {
+  const logContext: ExtendedLogContext = {
+    ...context,
+    path: context?.path || "unknown",
+    method: context?.method || "unknown",
+    error,
+    timestamp: new Date().toISOString(),
+  };
+
+  logger.error("Server Error", logContext);
+}
+
+// Main error handler for API routes (includes logging and response formatting)
+export function handleError(
+  error: unknown,
+  context?: ExtendedLogContext,
+): NextResponse<ErrorResponse> {
+  const logContext: ExtendedLogContext = {
+    ...context,
+    path: context?.path || "unknown",
+    method: context?.method || "unknown",
+  };
+
   // Handle our custom errors
   if (error instanceof BaseError) {
-    logger.warn({
-      message: error.message,
+    logger.warn("Custom error occurred", {
+      ...logContext,
+      error,
       statusCode: error.statusCode,
-      stack: error.stack,
     });
     return NextResponse.json(
       { error: error.message },
@@ -30,8 +57,9 @@ export function handleError(error: unknown): NextResponse<ErrorResponse> {
 
   // Handle Zod validation errors
   if (error instanceof ZodError) {
-    logger.warn({
-      message: "Validation error",
+    logger.warn("Validation error occurred", {
+      ...logContext,
+      error: new Error("Validation error"),
       details: error.errors,
     });
     return NextResponse.json(
@@ -42,21 +70,20 @@ export function handleError(error: unknown): NextResponse<ErrorResponse> {
 
   // Handle Prisma errors
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
-    logger.error({
-      message: "Database error",
+    logger.error("Database error occurred", {
+      ...logContext,
+      error: error as Error,
       code: error.code,
       meta: error.meta,
-      stack: error.stack,
     });
 
-    // Handle specific Prisma error codes
     switch (error.code) {
-      case "P2002": // Unique constraint violation
+      case "P2002":
         return NextResponse.json(
           { error: "Resource already exists", code: error.code },
           { status: HTTP_STATUS.CONFLICT },
         );
-      case "P2025": // Record not found
+      case "P2025":
         return NextResponse.json(
           { error: "Resource not found", code: error.code },
           { status: HTTP_STATUS.NOT_FOUND },
@@ -70,10 +97,11 @@ export function handleError(error: unknown): NextResponse<ErrorResponse> {
   }
 
   // Handle unexpected errors
-  logger.error({
-    message: "Unexpected error",
-    error: error instanceof Error ? error : "Unknown error",
-    stack: error instanceof Error ? error.stack : undefined,
+  const unexpectedError =
+    error instanceof Error ? error : new Error("Unknown error");
+  logger.error("Unexpected error occurred", {
+    ...logContext,
+    error: unexpectedError,
   });
 
   return NextResponse.json(

@@ -2,7 +2,7 @@ import { hash } from "bcryptjs";
 import { headers } from "next/headers";
 import { NextResponse, NextRequest } from "next/server";
 
-import { withErrorHandler } from "@/app/api/error";
+import { withErrorHandler } from "@/app/api/error/route";
 import { HTTP_STATUS } from "@/constants/http";
 import {
   ValidationError,
