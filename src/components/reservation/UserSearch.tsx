@@ -1,6 +1,8 @@
+// src/components/reservation/UserSearch.tsx
 import { Search } from "lucide-react";
 import { useState } from "react";
 
+import { Alert, AlertDescription } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -17,6 +19,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
+import { handleClientError } from "@/lib/errors/clientErrorHandler";
 import type { SelectedUser } from "@/types/reservation";
 
 interface SearchResult {
@@ -25,21 +28,24 @@ interface SearchResult {
   email: string;
 }
 
-interface UserSearchProps {
+export interface UserSearchProps {
   onUserSelect: (user: SelectedUser[]) => void;
   selectedUsers: SelectedUser[];
   maxUsers?: number;
+  isLoading?: boolean;
 }
 
 export const UserSearch = ({
   onUserSelect,
   selectedUsers,
   maxUsers = 3,
+  isLoading = false,
 }: UserSearchProps) => {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const [permissions, setPermissions] = useState({
     canModify: false,
     canTransfer: false,
@@ -48,16 +54,21 @@ export const UserSearch = ({
   const searchUsers = async (query: string) => {
     if (query.length < 2) {
       setSearchResults([]);
+      setSearchError(null);
       return;
     }
 
-    setLoading(true);
+    setIsSearching(true);
+    setSearchError(null);
+
     try {
       const response = await fetch(
         `/api/users/search?q=${encodeURIComponent(query)}`,
       );
+
       if (!response.ok) {
-        throw new Error("Failed to search users");
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to search users");
       }
 
       const data = await response.json();
@@ -70,10 +81,19 @@ export const UserSearch = ({
 
       setSearchResults(filteredResults);
     } catch (error) {
-      console.error("Error searching users:", error);
+      handleClientError(
+        error instanceof Error ? error : new Error("Failed to search users"),
+        {
+          path: "/api/users/search",
+          method: "GET",
+        },
+      );
+      setSearchError(
+        error instanceof Error ? error.message : "Failed to search users",
+      );
       setSearchResults([]);
     } finally {
-      setLoading(false);
+      setIsSearching(false);
     }
   };
 
@@ -93,6 +113,7 @@ export const UserSearch = ({
 
     setOpen(false);
     setSearch("");
+    setSearchError(null);
     setPermissions({ canModify: false, canTransfer: false });
   };
 
@@ -110,12 +131,14 @@ export const UserSearch = ({
             role="combobox"
             aria-expanded={open}
             className="w-full justify-between"
-            disabled={selectedUsers.length >= maxUsers}
+            disabled={selectedUsers.length >= maxUsers || isLoading}
           >
             <Search className="mr-2 h-4 w-4" />
-            {selectedUsers.length >= maxUsers
-              ? "Maximum users reached"
-              : "Search for users..."}
+            {isLoading
+              ? "Validating users..."
+              : selectedUsers.length >= maxUsers
+                ? "Maximum users reached"
+                : "Search for users..."}
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-[400px] p-0">
@@ -128,9 +151,16 @@ export const UserSearch = ({
                 searchUsers(value);
               }}
             />
-            {loading && <CommandLoading>Searching...</CommandLoading>}
-            {!loading && searchResults.length === 0 && (
+            {isSearching && <CommandLoading>Searching...</CommandLoading>}
+            {!isSearching && searchResults.length === 0 && !searchError && (
               <CommandEmpty>No users found</CommandEmpty>
+            )}
+            {searchError && (
+              <div className="p-2">
+                <Alert variant="error">
+                  <AlertDescription>{searchError}</AlertDescription>
+                </Alert>
+              </div>
             )}
             <CommandGroup>
               {searchResults.map((user) => (
@@ -195,6 +225,7 @@ export const UserSearch = ({
               variant="ghost"
               size="sm"
               onClick={() => handleRemoveUser(user.id)}
+              disabled={isLoading}
             >
               Remove
             </Button>

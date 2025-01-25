@@ -4,7 +4,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { addDays, format, isBefore, startOfDay } from "date-fns";
 import { useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
@@ -12,11 +12,12 @@ import { Alert, AlertDescription } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar/Calendar";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
+import { handleFormError } from "@/lib/errors/clientErrorHandler";
+import { reservationService } from "@/services/reservationService";
 import type { ReservationFormData, SelectedUser } from "@/types/reservation";
 
 import { UserSearch } from "./UserSearch";
 
-// Extend the reservation schema with additional validation
 const reservationSchema = z.object({
   reservationDate: z
     .date({
@@ -39,15 +40,18 @@ const reservationSchema = z.object({
 export const ReservationForm = () => {
   const router = useRouter();
   const [availableDates, setAvailableDates] = useState<Date[]>([]);
-  const [error, setError] = useState<string>("");
-  const [loading, setLoading] = useState(true);
   const [userReservations, setUserReservations] = useState<Date[]>([]);
+  const [isLoadingDates, setIsLoadingDates] = useState(true);
+  const [isLoadingUserReservations, setIsLoadingUserReservations] =
+    useState(true);
+  const [isValidatingUsers, setIsValidatingUsers] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const {
     handleSubmit,
     watch,
     setValue,
-    formState: { errors, isSubmitting },
+    formState: { errors: formErrors, isSubmitting },
   } = useForm<ReservationFormData>({
     resolver: zodResolver(reservationSchema),
     defaultValues: {
@@ -55,168 +59,130 @@ export const ReservationForm = () => {
     },
   });
 
+  const loadUserReservations = useCallback(async () => {
+    setIsLoadingUserReservations(true);
+    try {
+      const response = await reservationService.getUserReservations();
+      setUserReservations(response.reservations.map((d) => new Date(d)));
+      setError(null);
+    } catch (err) {
+      setError(handleFormError(err));
+    } finally {
+      setIsLoadingUserReservations(false);
+    }
+  }, []);
+
+  const loadAvailableDates = useCallback(async () => {
+    setIsLoadingDates(true);
+    try {
+      const startDate = new Date();
+      const endDate = addDays(startDate, 30);
+      const response = await reservationService.getAvailableDates(
+        startDate,
+        endDate,
+      );
+      setAvailableDates(response.availableDates.map((d) => new Date(d)));
+      setError(null);
+    } catch (err) {
+      setError(handleFormError(err));
+    } finally {
+      setIsLoadingDates(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadAvailableDates();
     loadUserReservations();
-  }, []);
+  }, [loadAvailableDates, loadUserReservations]);
 
-  const loadUserReservations = async () => {
-    try {
-      const response = await fetch("/api/reservations/user");
-      if (!response.ok) {
-        throw new Error("Failed to load user reservations");
-      }
-      const data = await response.json();
-      setUserReservations(data.reservations.map((d: string) => new Date(d)));
-    } catch (err) {
-      console.error("Error loading user reservations:", err);
-      setError("Failed to load user reservations");
-    }
-  };
-
-  // Check if a date would create a sequence longer than 3 days
-  const wouldExceedConsecutiveDays = (date: Date): boolean => {
-    const selectedDates = [...userReservations, date].map((d) =>
-      startOfDay(d).getTime(),
-    );
-    const sortedDates = [...new Set(selectedDates)].sort((a, b) => a - b);
-
-    // Check for consecutive dates
-    let consecutiveDays = 1;
-    let maxConsecutiveDays = 1;
-
-    for (let i = 1; i < sortedDates.length; i++) {
-      const diff =
-        (sortedDates[i] - sortedDates[i - 1]) / (1000 * 60 * 60 * 24);
-      if (diff === 1) {
-        consecutiveDays++;
-        maxConsecutiveDays = Math.max(maxConsecutiveDays, consecutiveDays);
-      } else {
-        consecutiveDays = 1;
-      }
-    }
-
-    return maxConsecutiveDays > 3;
-  };
-
-  const loadAvailableDates = async () => {
-    try {
-      setLoading(true);
-      const startDate = new Date();
-      const endDate = addDays(startDate, 30);
-      const response = await fetch(
-        `/api/reservations/availability?start=${startDate.toISOString()}&end=${endDate.toISOString()}`,
+  const wouldExceedConsecutiveDays = useCallback(
+    (date: Date): boolean => {
+      const selectedDates = [...userReservations, date].map((d) =>
+        startOfDay(d).getTime(),
       );
+      const sortedDates = [...new Set(selectedDates)].sort((a, b) => a - b);
 
-      if (!response.ok) {
-        throw new Error("Failed to load available dates");
+      let consecutiveDays = 1;
+      let maxConsecutiveDays = 1;
+
+      for (let i = 1; i < sortedDates.length; i++) {
+        const diff =
+          (sortedDates[i] - sortedDates[i - 1]) / (1000 * 60 * 60 * 24);
+        if (diff === 1) {
+          consecutiveDays++;
+          maxConsecutiveDays = Math.max(maxConsecutiveDays, consecutiveDays);
+        } else {
+          consecutiveDays = 1;
+        }
       }
 
-      const data = await response.json();
-      setAvailableDates(data.availableDates.map((d: string) => new Date(d)));
-    } catch (err) {
-      console.error("Error loading available dates:", err);
-      setError("Failed to load available dates");
-    } finally {
-      setLoading(false);
-    }
-  };
+      return maxConsecutiveDays > 3;
+    },
+    [userReservations],
+  );
 
   const validateUsers = async (users: SelectedUser[]): Promise<boolean> => {
+    setIsValidatingUsers(true);
     try {
-      const response = await fetch("/api/users/validate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ userIds: users.map((u) => u.id) }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to validate users");
-      }
-
-      const data = await response.json();
-      return data.valid;
+      const response = await reservationService.validateUsers(users);
+      setError(null);
+      return response.valid;
     } catch (err) {
-      console.error("Error validating users:", err);
-      setError("Failed to validate users");
+      setError(handleFormError(err));
       return false;
+    } finally {
+      setIsValidatingUsers(false);
     }
   };
 
   const onSubmit = async (data: ReservationFormData) => {
-    setError("");
-    setLoading(true);
+    setError(null);
 
     try {
-      // Check if date would exceed consecutive days limit
       if (wouldExceedConsecutiveDays(data.reservationDate)) {
-        setError("Cannot reserve more than 3 consecutive days");
-        return;
+        throw new Error("Cannot reserve more than 3 consecutive days");
       }
 
-      // Validate all users are registered
       const usersAreValid = await validateUsers(data.additionalUsers);
       if (!usersAreValid) {
-        setError("One or more selected users are not registered in the system");
-        return;
+        throw new Error(
+          "One or more selected users are not registered in the system",
+        );
       }
 
-      // Check availability
-      const availabilityResponse = await fetch(
-        `/api/reservations/check-availability?date=${data.reservationDate.toISOString()}`,
+      const availability = await reservationService.checkDateAvailability(
+        data.reservationDate,
       );
-
-      if (!availabilityResponse.ok) {
-        throw new Error("Failed to check availability");
-      }
-
-      const availability = await availabilityResponse.json();
       if (!availability.isAvailable) {
-        setError(availability.reason || "Date is not available");
-        return;
+        throw new Error(availability.reason || "Date is not available");
       }
 
-      // Create reservation
-      const response = await fetch("/api/reservations/create", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(data),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to create reservation");
+      const response = await reservationService.createReservation(data);
+      if (response.success) {
+        router.push("/dashboard?status=success&message=reservation-created");
+      } else {
+        throw new Error(response.error || "Failed to create reservation");
       }
-
-      // Handle successful reservation
-      router.push("/dashboard?status=success&message=reservation-created");
     } catch (err) {
-      console.error("Error creating reservation:", err);
-      setError(
-        err instanceof Error ? err.message : "Failed to create reservation",
-      );
-    } finally {
-      setLoading(false);
+      setError(handleFormError(err));
     }
   };
 
   const handleUserSelect = async (users: SelectedUser[]) => {
-    // Validate users before setting
+    setIsValidatingUsers(true);
     try {
       const usersAreValid = await validateUsers(users);
       if (!usersAreValid) {
-        setError("One or more selected users are not registered in the system");
-        return;
+        throw new Error(
+          "One or more selected users are not registered in the system",
+        );
       }
       setValue("additionalUsers", users);
-      setError(""); // Clear error if successful
+      setError(null);
     } catch (err) {
-      console.error("Error validating users:", err);
-      setError("Failed to validate users");
+      setError(handleFormError(err));
+    } finally {
+      setIsValidatingUsers(false);
     }
   };
 
@@ -249,11 +215,10 @@ export const ReservationForm = () => {
                       return;
                     }
                     setValue("reservationDate", date);
-                    setError(""); // Clear error if successful
+                    setError(null);
                   }
                 }}
                 disabled={(date) => {
-                  if (loading) return true;
                   const today = startOfDay(new Date());
                   const isBeforeToday = isBefore(date, today);
                   const isAvailable = availableDates.some(
@@ -261,15 +226,15 @@ export const ReservationForm = () => {
                       startOfDay(availableDate).toISOString() ===
                       startOfDay(date).toISOString(),
                   );
-                  return isBeforeToday || !isAvailable;
+                  return isLoadingDates || isBeforeToday || !isAvailable;
                 }}
                 initialFocus
                 className="mx-auto"
               />
             </div>
-            {errors.reservationDate && (
+            {formErrors.reservationDate && (
               <p className="text-sm text-destructive">
-                {errors.reservationDate.message}
+                {formErrors.reservationDate.message}
               </p>
             )}
           </div>
@@ -285,10 +250,11 @@ export const ReservationForm = () => {
               onUserSelect={handleUserSelect}
               selectedUsers={watch("additionalUsers") || []}
               maxUsers={3}
+              isLoading={isValidatingUsers}
             />
-            {errors.additionalUsers && (
+            {formErrors.additionalUsers && (
               <p className="text-sm text-destructive">
-                {errors.additionalUsers.message}
+                {formErrors.additionalUsers.message}
               </p>
             )}
           </div>
@@ -302,11 +268,14 @@ export const ReservationForm = () => {
           <Button
             type="submit"
             className="w-full"
-            disabled={loading || isSubmitting}
+            disabled={
+              isLoadingDates ||
+              isLoadingUserReservations ||
+              isValidatingUsers ||
+              isSubmitting
+            }
           >
-            {loading || isSubmitting
-              ? "Creating Reservation..."
-              : "Create Reservation"}
+            {isSubmitting ? "Creating Reservation..." : "Create Reservation"}
           </Button>
         </form>
       </CardContent>
