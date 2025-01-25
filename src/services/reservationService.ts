@@ -39,9 +39,11 @@ export const reservationService = {
     }
   },
 
-  async getUserReservations(): Promise<UserReservationsResponse> {
+  async getUserReservations(
+    signal?: AbortSignal,
+  ): Promise<UserReservationsResponse> {
     try {
-      const response = await fetch("/api/reservations/user");
+      const response = await fetch("/api/reservations/user", { signal });
       if (!response.ok) {
         await handleApiError(response);
       }

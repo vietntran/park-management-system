@@ -1,5 +1,6 @@
 import { Metadata } from "next";
 
+import { ReservationErrorBoundary } from "@/components/error/ReservationErrorBoundary";
 import { ReservationForm } from "@/components/reservation/ReservationForm";
 
 export const metadata: Metadata = {
@@ -10,7 +11,9 @@ export const metadata: Metadata = {
 export default function NewReservationPage() {
   return (
     <div className="container mx-auto py-10">
-      <ReservationForm />
+      <ReservationErrorBoundary>
+        <ReservationForm />
+      </ReservationErrorBoundary>
     </div>
   );
 }

@@ -8,6 +8,7 @@ interface ErrorContext {
   method?: string;
   statusCode?: number;
   userId?: string;
+  additionalInfo?: Record<string, unknown>;
 }
 
 export async function handleClientError(error: Error, context?: ErrorContext) {

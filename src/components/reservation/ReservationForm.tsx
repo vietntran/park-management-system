@@ -59,16 +59,24 @@ export const ReservationForm = () => {
     },
   });
 
-  const loadUserReservations = useCallback(async () => {
+  const loadUserReservations = useCallback(async (signal?: AbortSignal) => {
     setIsLoadingUserReservations(true);
     try {
-      const response = await reservationService.getUserReservations();
-      setUserReservations(response.reservations.map((d) => new Date(d)));
-      setError(null);
+      const response = await reservationService.getUserReservations(signal);
+      // Only update state if the request wasn't aborted
+      if (!signal?.aborted) {
+        setUserReservations(response.reservations.map((d) => new Date(d)));
+        setError(null);
+      }
     } catch (err) {
-      setError(handleFormError(err));
+      // Only set error if request wasn't aborted
+      if (!signal?.aborted) {
+        setError(handleFormError(err));
+      }
     } finally {
-      setIsLoadingUserReservations(false);
+      if (!signal?.aborted) {
+        setIsLoadingUserReservations(false);
+      }
     }
   }, []);
 

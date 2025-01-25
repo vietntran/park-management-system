@@ -22,6 +22,8 @@ import { Switch } from "@/components/ui/switch";
 import { handleClientError } from "@/lib/errors/clientErrorHandler";
 import type { SelectedUser } from "@/types/reservation";
 
+import { ComponentErrorBoundary } from "../error/ComponentErrorBoundary";
+
 interface SearchResult {
   id: string;
   name: string;
@@ -123,115 +125,123 @@ export const UserSearch = ({
   };
 
   return (
-    <div className="w-full space-y-4">
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <Button
-            variant="outline"
-            role="combobox"
-            aria-expanded={open}
-            className="w-full justify-between"
-            disabled={selectedUsers.length >= maxUsers || isLoading}
-          >
-            <Search className="mr-2 h-4 w-4" />
-            {isLoading
-              ? "Validating users..."
-              : selectedUsers.length >= maxUsers
-                ? "Maximum users reached"
-                : "Search for users..."}
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-[400px] p-0">
-          <Command>
-            <CommandInput
-              placeholder="Search by name or email..."
-              value={search}
-              onValueChange={(value) => {
-                setSearch(value);
-                searchUsers(value);
-              }}
-            />
-            {isSearching && <CommandLoading>Searching...</CommandLoading>}
-            {!isSearching && searchResults.length === 0 && !searchError && (
-              <CommandEmpty>No users found</CommandEmpty>
-            )}
-            {searchError && (
-              <div className="p-2">
-                <Alert variant="error">
-                  <AlertDescription>{searchError}</AlertDescription>
-                </Alert>
-              </div>
-            )}
-            <CommandGroup>
-              {searchResults.map((user) => (
-                <CommandItem
-                  key={user.id}
-                  onSelect={() => handleSelect(user)}
-                  className="flex justify-between"
-                >
-                  <div>
-                    <p>{user.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {user.email}
-                    </p>
-                  </div>
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </Command>
-          <div className="p-4 border-t">
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label htmlFor="canModify">Can modify reservation</label>
-                <Switch
-                  id="canModify"
-                  checked={permissions.canModify}
-                  onCheckedChange={(checked) =>
-                    setPermissions((prev) => ({ ...prev, canModify: checked }))
-                  }
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <label htmlFor="canTransfer">Can transfer reservation</label>
-                <Switch
-                  id="canTransfer"
-                  checked={permissions.canTransfer}
-                  onCheckedChange={(checked) =>
-                    setPermissions((prev) => ({
-                      ...prev,
-                      canTransfer: checked,
-                    }))
-                  }
-                />
-              </div>
-            </div>
-          </div>
-        </PopoverContent>
-      </Popover>
-
-      {/* Selected Users List */}
-      <div className="space-y-2">
-        {selectedUsers.map((user) => (
-          <Card key={user.id} className="p-4 flex justify-between items-center">
-            <div>
-              <p className="font-medium">{user.name}</p>
-              <p className="text-sm text-muted-foreground">{user.email}</p>
-              <div className="text-xs text-muted-foreground mt-1">
-                {user.canModify && "Can modify • "}
-                {user.canTransfer && "Can transfer"}
-              </div>
-            </div>
+    <ComponentErrorBoundary componentName="UserSearch">
+      <div className="w-full space-y-4">
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger asChild>
             <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => handleRemoveUser(user.id)}
-              disabled={isLoading}
+              variant="outline"
+              role="combobox"
+              aria-expanded={open}
+              className="w-full justify-between"
+              disabled={selectedUsers.length >= maxUsers || isLoading}
             >
-              Remove
+              <Search className="mr-2 h-4 w-4" />
+              {isLoading
+                ? "Validating users..."
+                : selectedUsers.length >= maxUsers
+                  ? "Maximum users reached"
+                  : "Search for users..."}
             </Button>
-          </Card>
-        ))}
+          </PopoverTrigger>
+          <PopoverContent className="w-[400px] p-0">
+            <Command>
+              <CommandInput
+                placeholder="Search by name or email..."
+                value={search}
+                onValueChange={(value) => {
+                  setSearch(value);
+                  searchUsers(value);
+                }}
+              />
+              {isSearching && <CommandLoading>Searching...</CommandLoading>}
+              {!isSearching && searchResults.length === 0 && !searchError && (
+                <CommandEmpty>No users found</CommandEmpty>
+              )}
+              {searchError && (
+                <div className="p-2">
+                  <Alert variant="error">
+                    <AlertDescription>{searchError}</AlertDescription>
+                  </Alert>
+                </div>
+              )}
+              <CommandGroup>
+                {searchResults.map((user) => (
+                  <CommandItem
+                    key={user.id}
+                    onSelect={() => handleSelect(user)}
+                    className="flex justify-between"
+                  >
+                    <div>
+                      <p>{user.name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {user.email}
+                      </p>
+                    </div>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </Command>
+            <div className="p-4 border-t">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label htmlFor="canModify">Can modify reservation</label>
+                  <Switch
+                    id="canModify"
+                    checked={permissions.canModify}
+                    onCheckedChange={(checked) =>
+                      setPermissions((prev) => ({
+                        ...prev,
+                        canModify: checked,
+                      }))
+                    }
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <label htmlFor="canTransfer">Can transfer reservation</label>
+                  <Switch
+                    id="canTransfer"
+                    checked={permissions.canTransfer}
+                    onCheckedChange={(checked) =>
+                      setPermissions((prev) => ({
+                        ...prev,
+                        canTransfer: checked,
+                      }))
+                    }
+                  />
+                </div>
+              </div>
+            </div>
+          </PopoverContent>
+        </Popover>
+
+        {/* Selected Users List */}
+        <div className="space-y-2">
+          {selectedUsers.map((user) => (
+            <Card
+              key={user.id}
+              className="p-4 flex justify-between items-center"
+            >
+              <div>
+                <p className="font-medium">{user.name}</p>
+                <p className="text-sm text-muted-foreground">{user.email}</p>
+                <div className="text-xs text-muted-foreground mt-1">
+                  {user.canModify && "Can modify • "}
+                  {user.canTransfer && "Can transfer"}
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleRemoveUser(user.id)}
+                disabled={isLoading}
+              >
+                Remove
+              </Button>
+            </Card>
+          ))}
+        </div>
       </div>
-    </div>
+    </ComponentErrorBoundary>
   );
 };

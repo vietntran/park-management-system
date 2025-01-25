@@ -4,11 +4,15 @@
 import { SessionProvider } from "next-auth/react";
 import { Toaster } from "sonner";
 
+import { RootErrorBoundary } from "../error/RootErrorBoundary";
+
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
-    <SessionProvider>
-      {children}
-      <Toaster />
-    </SessionProvider>
+    <RootErrorBoundary>
+      <SessionProvider>
+        {children}
+        <Toaster />
+      </SessionProvider>
+    </RootErrorBoundary>
   );
 }
