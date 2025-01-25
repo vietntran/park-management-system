@@ -2,7 +2,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { addDays, format } from "date-fns";
+import { addDays, format, isBefore, startOfDay } from "date-fns";
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -37,7 +37,7 @@ const reservationSchema = z.object({
 export const ReservationForm = () => {
   const [availableDates, setAvailableDates] = useState<Date[]>([]);
   const [error, setError] = useState<string>("");
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const {
     handleSubmit,
@@ -57,6 +57,7 @@ export const ReservationForm = () => {
 
   const loadAvailableDates = async () => {
     try {
+      setLoading(true);
       const startDate = new Date();
       const endDate = addDays(startDate, 30);
       const response = await fetch(
@@ -72,6 +73,8 @@ export const ReservationForm = () => {
     } catch (err) {
       console.error("Error loading available dates:", err);
       setError("Failed to load available dates");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -120,9 +123,8 @@ export const ReservationForm = () => {
     }
   };
 
-  const handleUserSelect = (user: SelectedUser) => {
-    const currentUsers = watch("additionalUsers") || [];
-    setValue("additionalUsers", [...currentUsers, user]);
+  const handleUserSelect = (users: SelectedUser[]) => {
+    setValue("additionalUsers", users);
   };
 
   const selectedDate = watch("reservationDate");
@@ -149,11 +151,15 @@ export const ReservationForm = () => {
                 selected={selectedDate}
                 onSelect={(date) => date && setValue("reservationDate", date)}
                 disabled={(date) => {
-                  if (date < new Date()) return true;
-                  return !availableDates.some(
+                  if (loading) return true; // Disable all dates while loading
+                  const today = startOfDay(new Date());
+                  const isBeforeToday = isBefore(date, today);
+                  const isAvailable = availableDates.some(
                     (availableDate) =>
-                      availableDate.toDateString() === date.toDateString(),
+                      startOfDay(availableDate).toISOString() ===
+                      startOfDay(date).toISOString(),
                   );
+                  return isBeforeToday || !isAvailable;
                 }}
                 initialFocus
                 className="mx-auto"

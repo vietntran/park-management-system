@@ -26,7 +26,7 @@ interface SearchResult {
 }
 
 interface UserSearchProps {
-  onUserSelect: (user: SelectedUser) => void;
+  onUserSelect: (user: SelectedUser[]) => void;
   selectedUsers: SelectedUser[];
   maxUsers?: number;
 }
@@ -82,11 +82,14 @@ export const UserSearch = ({
       return;
     }
 
-    onUserSelect({
-      ...user,
-      canModify: permissions.canModify,
-      canTransfer: permissions.canTransfer,
-    });
+    onUserSelect([
+      ...selectedUsers,
+      {
+        ...user,
+        canModify: permissions.canModify,
+        canTransfer: permissions.canTransfer,
+      },
+    ]);
 
     setOpen(false);
     setSearch("");
@@ -95,8 +98,7 @@ export const UserSearch = ({
 
   const handleRemoveUser = (userId: string) => {
     const updatedUsers = selectedUsers.filter((user) => user.id !== userId);
-    // Pass the last user in the updated list, or undefined if empty
-    onUserSelect(updatedUsers[updatedUsers.length - 1]);
+    onUserSelect(updatedUsers);
   };
 
   return (

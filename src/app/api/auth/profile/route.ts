@@ -3,8 +3,8 @@ import { headers } from "next/headers";
 import { NextResponse, NextRequest } from "next/server";
 import { getServerSession } from "next-auth";
 
-import { withErrorHandler } from "@/app/api/error/route";
 import { HTTP_STATUS } from "@/constants/http";
+import { withErrorHandler } from "@/lib/api/withErrorHandler";
 import {
   AuthenticationError,
   ValidationError,
@@ -148,10 +148,14 @@ export const PUT = withErrorHandler<UserProfile>(async (req: NextRequest) => {
 
     return NextResponse.json(updatedUser, { status: HTTP_STATUS.OK });
   } catch (error) {
+    // Type guard to check if error is an Error object
+    const err =
+      error instanceof Error ? error : new Error("Unknown error occurred");
+
     logger.error("Profile update error", {
       requestId,
       ip,
-      error,
+      error: err,
     });
 
     if (error instanceof Prisma.PrismaClientKnownRequestError) {

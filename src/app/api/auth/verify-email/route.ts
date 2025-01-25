@@ -2,8 +2,8 @@ import { headers } from "next/headers";
 import { NextResponse, NextRequest } from "next/server";
 import { getServerSession } from "next-auth";
 
-import { withErrorHandler } from "@/app/api/error/route";
 import { HTTP_STATUS } from "@/constants/http";
+import { withErrorHandler } from "@/lib/api/withErrorHandler";
 import {
   AuthenticationError,
   ValidationError,
