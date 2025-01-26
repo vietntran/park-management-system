@@ -15,6 +15,7 @@ import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { handleFormError } from "@/lib/errors/clientErrorHandler";
 import { reservationService } from "@/services/reservationService";
 import type { ReservationFormData, SelectedUser } from "@/types/reservation";
+import { validateConsecutiveDays } from "@/utils/reservationValidation";
 
 import { UserSearch } from "./UserSearch";
 
@@ -103,32 +104,6 @@ export const ReservationForm = () => {
     loadUserReservations();
   }, [loadAvailableDates, loadUserReservations]);
 
-  const wouldExceedConsecutiveDays = useCallback(
-    (date: Date): boolean => {
-      const selectedDates = [...userReservations, date].map((d) =>
-        startOfDay(d).getTime(),
-      );
-      const sortedDates = [...new Set(selectedDates)].sort((a, b) => a - b);
-
-      let consecutiveDays = 1;
-      let maxConsecutiveDays = 1;
-
-      for (let i = 1; i < sortedDates.length; i++) {
-        const diff =
-          (sortedDates[i] - sortedDates[i - 1]) / (1000 * 60 * 60 * 24);
-        if (diff === 1) {
-          consecutiveDays++;
-          maxConsecutiveDays = Math.max(maxConsecutiveDays, consecutiveDays);
-        } else {
-          consecutiveDays = 1;
-        }
-      }
-
-      return maxConsecutiveDays > 3;
-    },
-    [userReservations],
-  );
-
   const validateUsers = async (users: SelectedUser[]): Promise<boolean> => {
     setIsValidatingUsers(true);
     try {
@@ -147,7 +122,7 @@ export const ReservationForm = () => {
     setError(null);
 
     try {
-      if (wouldExceedConsecutiveDays(data.reservationDate)) {
+      if (!validateConsecutiveDays(userReservations, data.reservationDate)) {
         throw new Error("Cannot reserve more than 3 consecutive days");
       }
 
@@ -218,7 +193,7 @@ export const ReservationForm = () => {
                 selected={selectedDate}
                 onSelect={(date) => {
                   if (date) {
-                    if (wouldExceedConsecutiveDays(date)) {
+                    if (!validateConsecutiveDays(userReservations, date)) {
                       setError("Cannot reserve more than 3 consecutive days");
                       return;
                     }
