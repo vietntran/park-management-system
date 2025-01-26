@@ -1,4 +1,3 @@
-// src/components/reservation/UserSearch.tsx
 import { Search } from "lucide-react";
 import { useState } from "react";
 
@@ -19,8 +18,8 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
-import { handleClientError } from "@/lib/errors/clientErrorHandler";
 import type { SelectedUser } from "@/types/reservation";
+import { searchUsers } from "@/utils/userSearch";
 
 import { ComponentErrorBoundary } from "../error/ComponentErrorBoundary";
 
@@ -53,50 +52,12 @@ export const UserSearch = ({
     canTransfer: false,
   });
 
-  const searchUsers = async (query: string) => {
-    if (query.length < 2) {
-      setSearchResults([]);
-      setSearchError(null);
-      return;
-    }
-
+  const handleSearch = async (query: string) => {
     setIsSearching(true);
-    setSearchError(null);
-
-    try {
-      const response = await fetch(
-        `/api/users/search?q=${encodeURIComponent(query)}`,
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to search users");
-      }
-
-      const data = await response.json();
-
-      // Filter out already selected users
-      const filteredResults = data.filter(
-        (user: SearchResult) =>
-          !selectedUsers.some((selected) => selected.id === user.id),
-      );
-
-      setSearchResults(filteredResults);
-    } catch (error) {
-      handleClientError(
-        error instanceof Error ? error : new Error("Failed to search users"),
-        {
-          path: "/api/users/search",
-          method: "GET",
-        },
-      );
-      setSearchError(
-        error instanceof Error ? error.message : "Failed to search users",
-      );
-      setSearchResults([]);
-    } finally {
-      setIsSearching(false);
-    }
+    const { results, error } = await searchUsers(query, selectedUsers);
+    setSearchResults(results);
+    setSearchError(error);
+    setIsSearching(false);
   };
 
   const handleSelect = (user: SearchResult) => {
@@ -151,7 +112,7 @@ export const UserSearch = ({
                 value={search}
                 onValueChange={(value) => {
                   setSearch(value);
-                  searchUsers(value);
+                  handleSearch(value);
                 }}
               />
               {isSearching && <CommandLoading>Searching...</CommandLoading>}
