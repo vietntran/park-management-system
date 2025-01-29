@@ -9,6 +9,7 @@ import {
   validateDateAvailability,
   validateUserSelection,
   loadUserReservationsData,
+  isBeforeNextDay,
 } from "@/utils/reservationValidation";
 
 // Mock reservationService
@@ -101,27 +102,26 @@ describe("isDateAvailable", () => {
 });
 
 describe("isDateDisabled", () => {
-  const today = new Date();
-  const availableDates = [today, addDays(today, 1), addDays(today, 2)];
+  const tomorrow = addDays(new Date(), 1);
+  const availableDates = [tomorrow, addDays(tomorrow, 1), addDays(tomorrow, 2)];
 
-  it("disables dates before today", () => {
-    const yesterday = subDays(today, 1);
-    expect(isDateDisabled(yesterday, availableDates, false)).toBe(true);
+  it("disables dates before tomorrow", () => {
+    const today = new Date();
+    expect(isDateDisabled(today, availableDates, false)).toBe(true);
   });
 
-  it("disables unavailable dates", () => {
-    const unavailableDate = addDays(today, 5);
+  it("disables unavailable dates after tomorrow", () => {
+    const unavailableDate = addDays(tomorrow, 5);
     expect(isDateDisabled(unavailableDate, availableDates, false)).toBe(true);
   });
 
   it("disables all dates when loading", () => {
-    const availableDate = addDays(today, 1);
+    const availableDate = addDays(tomorrow, 1);
     expect(isDateDisabled(availableDate, availableDates, true)).toBe(true);
   });
 
-  it("enables available future dates when not loading", () => {
-    const availableDate = addDays(today, 1);
-    expect(isDateDisabled(availableDate, availableDates, false)).toBe(false);
+  it("enables available dates after tomorrow when not loading", () => {
+    expect(isDateDisabled(tomorrow, availableDates, false)).toBe(false);
   });
 });
 
@@ -261,5 +261,29 @@ describe("loadUserReservationsData", () => {
 
     expect(result.data).toBeUndefined();
     expect(result.error).toBeDefined();
+  });
+});
+
+describe("isBeforeNextDay", () => {
+  it("returns true for today's date", () => {
+    const today = new Date();
+    expect(isBeforeNextDay(today)).toBe(true);
+  });
+
+  it("returns false for tomorrow's date", () => {
+    const tomorrow = addDays(new Date(), 1);
+    expect(isBeforeNextDay(tomorrow)).toBe(false);
+  });
+
+  it("returns true for dates before tomorrow", () => {
+    const yesterday = subDays(new Date(), 1);
+    expect(isBeforeNextDay(yesterday)).toBe(true);
+  });
+
+  it("handles timezone edge cases", () => {
+    const now = new Date();
+    const almostMidnight = new Date(now);
+    almostMidnight.setHours(23, 59, 59, 999);
+    expect(isBeforeNextDay(almostMidnight)).toBe(true);
   });
 });

@@ -46,15 +46,21 @@ export const isDateAvailable = (
   );
 };
 
+export const isBeforeNextDay = (date: Date): boolean => {
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(0, 0, 0, 0);
+  return isBefore(date, tomorrow);
+};
+
 export const isDateDisabled = (
   date: Date,
   availableDates: Date[],
   isLoadingDates: boolean,
 ): boolean => {
-  const today = startOfDay(new Date());
-  const isBeforeToday = isBefore(date, today);
+  const beforeNextDay = isBeforeNextDay(date);
   return (
-    isLoadingDates || isBeforeToday || !isDateAvailable(date, availableDates)
+    isLoadingDates || beforeNextDay || !isDateAvailable(date, availableDates)
   );
 };
 

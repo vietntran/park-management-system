@@ -8,6 +8,7 @@ import { ValidationError, ConflictError } from "@/lib/errors/ApplicationErrors";
 import logger from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
 import { validateConsecutiveDates } from "@/lib/validations/reservation";
+import { isBeforeNextDay } from "@/utils/reservationValidation";
 
 // Define response interface for type safety
 interface AvailabilityResponse {
@@ -44,6 +45,20 @@ export const GET = withErrorHandler<AvailabilityResponse>(
       });
 
       throw new ValidationError("Invalid date format");
+    }
+
+    if (isBeforeNextDay(checkDate)) {
+      logger.warn("Date is before next day", {
+        requestId,
+        date: checkDate,
+      });
+
+      return NextResponse.json({
+        isAvailable: false,
+        totalBookings: 0,
+        remainingSpots: 0,
+        reason: "Reservations can be made up to 11:59 PM for the following day",
+      });
     }
 
     // If user is logged in, check consecutive dates restriction

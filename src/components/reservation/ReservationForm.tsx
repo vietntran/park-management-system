@@ -2,7 +2,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { addDays, format, isBefore, startOfDay } from "date-fns";
+import { addDays, format } from "date-fns";
 import { useRouter } from "next/navigation";
 import { useState, useEffect, useCallback } from "react";
 import { useForm } from "react-hook-form";
@@ -15,7 +15,11 @@ import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { handleFormError } from "@/lib/errors/clientErrorHandler";
 import { reservationService } from "@/services/reservationService";
 import type { ReservationFormData, SelectedUser } from "@/types/reservation";
-import { validateConsecutiveDays } from "@/utils/reservationValidation";
+import {
+  isBeforeNextDay,
+  isDateDisabled,
+  validateConsecutiveDays,
+} from "@/utils/reservationValidation";
 
 import { UserSearch } from "./UserSearch";
 
@@ -24,7 +28,10 @@ const reservationSchema = z.object({
     .date({
       required_error: "Please select a date",
     })
-    .min(new Date(), "Reservation must be for a future date"),
+    .refine(
+      (date) => !isBeforeNextDay(date),
+      "Reservations can be made up to 11:59 PM for the following day",
+    ),
   additionalUsers: z
     .array(
       z.object({
@@ -193,6 +200,13 @@ export const ReservationForm = () => {
                 selected={selectedDate}
                 onSelect={(date) => {
                   if (date) {
+                    if (isBeforeNextDay(date)) {
+                      setError(
+                        "Reservations can be made up to 11:59 PM for the following day",
+                      );
+                      return;
+                    }
+
                     if (!validateConsecutiveDays(userReservations, date)) {
                       setError("Cannot reserve more than 3 consecutive days");
                       return;
@@ -201,16 +215,9 @@ export const ReservationForm = () => {
                     setError(null);
                   }
                 }}
-                disabled={(date) => {
-                  const today = startOfDay(new Date());
-                  const isBeforeToday = isBefore(date, today);
-                  const isAvailable = availableDates.some(
-                    (availableDate) =>
-                      startOfDay(availableDate).toISOString() ===
-                      startOfDay(date).toISOString(),
-                  );
-                  return isLoadingDates || isBeforeToday || !isAvailable;
-                }}
+                disabled={(date) =>
+                  isDateDisabled(date, availableDates, isLoadingDates)
+                }
                 initialFocus
                 className="mx-auto"
               />

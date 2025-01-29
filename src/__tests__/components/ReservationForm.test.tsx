@@ -108,11 +108,14 @@ describe("ReservationForm", () => {
 
   beforeEach(() => {
     // Reset all mocks before each test
+    // Reset all mocks before each test
     jest.clearAllMocks();
 
     // Setup default mock responses
+    const tomorrow = addDays(new Date(), 1);
+    const dayAfterTomorrow = addDays(tomorrow, 1);
     (reservationService.getAvailableDates as jest.Mock).mockResolvedValue({
-      availableDates: [today, tomorrow].map((d) => d.toISOString()),
+      availableDates: [tomorrow, dayAfterTomorrow].map((d) => d.toISOString()),
     });
     (reservationService.getUserReservations as jest.Mock).mockResolvedValue({
       reservations: [],
@@ -142,11 +145,18 @@ describe("ReservationForm", () => {
       render(<ReservationForm />);
     });
 
+    // Check that today's date is disabled
     const calendarEl = screen.getByTestId("calendar");
-    const dateButton = within(calendarEl).getByRole("button", {
+    const todayButton = within(calendarEl).getByRole("button", {
+      name: today.getDate().toString(),
+    });
+    expect(todayButton).toBeDisabled();
+
+    // Check that yesterday's date is disabled
+    const yesterdayButton = within(calendarEl).getByRole("button", {
       name: yesterday.getDate().toString(),
     });
-    expect(dateButton).toBeDisabled();
+    expect(yesterdayButton).toBeDisabled();
   });
 
   it("prevents selecting unavailable dates", async () => {
@@ -286,6 +296,45 @@ describe("ReservationForm", () => {
       expect(mockRouter.push).toHaveBeenCalledWith(
         "/dashboard?status=success&message=reservation-created",
       );
+    });
+  });
+
+  it("disables today's date selection", async () => {
+    await act(async () => {
+      render(<ReservationForm />);
+    });
+
+    const calendarEl = screen.getByTestId("calendar");
+    const today = new Date();
+    const todayButton = within(calendarEl).getByRole("button", {
+      name: today.getDate().toString(),
+    });
+
+    // Verify the button is disabled
+    expect(todayButton).toBeDisabled();
+
+    // Verify no alert message is present (since the date can't be clicked)
+    expect(screen.queryByTestId("alert-description")).not.toBeInTheDocument();
+  });
+
+  it("allows selecting tomorrow's date", async () => {
+    await act(async () => {
+      render(<ReservationForm />);
+    });
+
+    // Select tomorrow's date
+    const calendarEl = screen.getByTestId("calendar");
+    const dateButton = within(calendarEl).getByRole("button", {
+      name: tomorrow.getDate().toString(),
+    });
+
+    await act(async () => {
+      await userEvent.click(dateButton);
+    });
+
+    // Should not show error message
+    await waitFor(() => {
+      expect(screen.queryByTestId("alert-description")).not.toBeInTheDocument();
     });
   });
 });
