@@ -3,8 +3,6 @@ export type SelectedUser = {
   id: string;
   name: string;
   email: string;
-  canModify: boolean;
-  canTransfer: boolean;
 };
 
 export type ReservationFormData = {
@@ -48,4 +46,37 @@ export interface ErrorStates {
   userReservationsError: string | null;
   validationError: string | null;
   submissionError: string | null;
+}
+
+export enum ReservationStatus {
+  ACTIVE = "ACTIVE",
+  CANCELLED = "CANCELLED",
+}
+
+export enum ReservationUserStatus {
+  ACTIVE = "ACTIVE",
+  CANCELLED = "CANCELLED",
+}
+
+export interface ReservationUser {
+  reservationId: string;
+  userId: string;
+  isPrimary: boolean;
+  status: ReservationUserStatus;
+  addedAt: Date;
+  cancelledAt: Date | null;
+}
+
+export interface CancellationResponse {
+  success: boolean;
+  error?: string;
+}
+
+export interface ReservationDetails extends ReservationFormData {
+  id: string;
+  primaryUserId: string;
+  createdAt: Date;
+  status: ReservationStatus;
+  canTransfer: boolean;
+  reservationUsers: ReservationUser[];
 }

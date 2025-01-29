@@ -72,8 +72,6 @@ describe("UserSearch", () => {
     id: "user1",
     name: "John Doe",
     email: "john@example.com",
-    canModify: false,
-    canTransfer: false,
   };
 
   const mockProps = {
@@ -152,7 +150,7 @@ describe("UserSearch", () => {
     });
   });
 
-  it("calls onUserSelect with user and permissions when user is selected", async () => {
+  it("calls onUserSelect with user when user is selected", async () => {
     render(<UserSearch {...mockProps} />);
 
     await act(async () => {
@@ -168,21 +166,11 @@ describe("UserSearch", () => {
     });
 
     await act(async () => {
-      // Toggle permissions
-      await userEvent.click(screen.getByLabelText("Can modify reservation"));
-      await userEvent.click(screen.getByLabelText("Can transfer reservation"));
-
       // Select the user
       await userEvent.click(screen.getByText(mockUser.name));
     });
 
-    expect(mockProps.onUserSelect).toHaveBeenCalledWith([
-      {
-        ...mockUser,
-        canModify: true,
-        canTransfer: true,
-      },
-    ]);
+    expect(mockProps.onUserSelect).toHaveBeenCalledWith([mockUser]);
   });
 
   it("allows removing selected users", async () => {
@@ -217,7 +205,7 @@ describe("UserSearch", () => {
     });
   });
 
-  it("clears search input and permissions after selecting a user", async () => {
+  it("clears search input after selecting a user", async () => {
     render(
       <UserSearch
         selectedUsers={[]}
@@ -246,12 +234,6 @@ describe("UserSearch", () => {
       expect(screen.getByText(mockUser.email)).toBeInTheDocument();
     });
 
-    // Toggle permissions
-    await act(async () => {
-      await userEvent.click(screen.getByLabelText("Can modify reservation"));
-      await userEvent.click(screen.getByLabelText("Can transfer reservation"));
-    });
-
     // Select the user
     await act(async () => {
       await userEvent.click(screen.getByText(mockUser.name));
@@ -259,10 +241,6 @@ describe("UserSearch", () => {
 
     // Verify search input is cleared
     expect(searchInput).toHaveValue("");
-
-    // Verify checkboxes are unchecked
-    expect(screen.getByLabelText("Can modify reservation")).not.toBeChecked();
-    expect(screen.getByLabelText("Can transfer reservation")).not.toBeChecked();
   });
 
   it("disables search when isLoading is true", async () => {

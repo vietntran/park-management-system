@@ -1,17 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { handleServerError } from "@/lib/errors/serverErrorHandler";
+import { RouteContext } from "@/types/route";
 
 // Define the error response type
 interface ErrorResponse {
   error: string;
   details?: unknown;
   code?: string;
-}
-
-// Define route context type
-interface RouteContext {
-  params?: { [key: string]: string | string[] };
 }
 
 // Define response type that can be either success (T) or error

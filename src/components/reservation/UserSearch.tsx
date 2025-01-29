@@ -17,7 +17,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Switch } from "@/components/ui/switch";
 import type { SelectedUser } from "@/types/reservation";
 import { searchUsers } from "@/utils/userSearch";
 
@@ -47,10 +46,6 @@ export const UserSearch = ({
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
-  const [permissions, setPermissions] = useState({
-    canModify: false,
-    canTransfer: false,
-  });
 
   const handleSearch = async (query: string) => {
     setIsSearching(true);
@@ -65,19 +60,10 @@ export const UserSearch = ({
       return;
     }
 
-    onUserSelect([
-      ...selectedUsers,
-      {
-        ...user,
-        canModify: permissions.canModify,
-        canTransfer: permissions.canTransfer,
-      },
-    ]);
-
+    onUserSelect([...selectedUsers, user]);
     setOpen(false);
     setSearch("");
     setSearchError(null);
-    setPermissions({ canModify: false, canTransfer: false });
   };
 
   const handleRemoveUser = (userId: string) => {
@@ -143,36 +129,6 @@ export const UserSearch = ({
                 ))}
               </CommandGroup>
             </Command>
-            <div className="p-4 border-t">
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label htmlFor="canModify">Can modify reservation</label>
-                  <Switch
-                    id="canModify"
-                    checked={permissions.canModify}
-                    onCheckedChange={(checked) =>
-                      setPermissions((prev) => ({
-                        ...prev,
-                        canModify: checked,
-                      }))
-                    }
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <label htmlFor="canTransfer">Can transfer reservation</label>
-                  <Switch
-                    id="canTransfer"
-                    checked={permissions.canTransfer}
-                    onCheckedChange={(checked) =>
-                      setPermissions((prev) => ({
-                        ...prev,
-                        canTransfer: checked,
-                      }))
-                    }
-                  />
-                </div>
-              </div>
-            </div>
           </PopoverContent>
         </Popover>
 
@@ -186,10 +142,6 @@ export const UserSearch = ({
               <div>
                 <p className="font-medium">{user.name}</p>
                 <p className="text-sm text-muted-foreground">{user.email}</p>
-                <div className="text-xs text-muted-foreground mt-1">
-                  {user.canModify && "Can modify • "}
-                  {user.canTransfer && "Can transfer"}
-                </div>
               </div>
               <Button
                 variant="ghost"

@@ -72,7 +72,6 @@ model User {
   reservationUsers       ReservationUser[]
   transfersFrom         ReservationTransfer[] @relation("FromUser")
   transfersTo           ReservationTransfer[] @relation("ToUser")
-  cancelledReservations ReservationCancellation[]
 
   @@map("users")
 }
@@ -95,21 +94,20 @@ model Address {
 }
 
 model Reservation {
-  id              String   @id @default(uuid())
-  primaryUserId   String   @map("primary_user_id")
-  reservationDate DateTime @map("reservation_date")
-  createdAt       DateTime @default(now()) @map("created_at")
-  isCancelled     Boolean  @default(false) @map("is_cancelled")
-  isTransferable  Boolean  @default(true) @map("is_transferable")
+  id              String            @id @default(uuid())
+  primaryUserId   String            @map("primary_user_id")
+  reservationDate DateTime          @map("reservation_date")
+  createdAt       DateTime          @default(now()) @map("created_at")
+  status          ReservationStatus @default(ACTIVE)
+  canTransfer     Boolean           @default(true) @map("can_transfer")
 
   // Relations
   primaryUser     User                    @relation(fields: [primaryUserId], references: [id])
   reservationUsers ReservationUser[]
   transfers       ReservationTransfer[]
   dateCapacity    DateCapacity            @relation(fields: [reservationDate], references: [date])
-  cancellation    ReservationCancellation?
 
-  @@index([primaryUserId, reservationDate]) // Added for consecutive dates checking
+  @@index([primaryUserId, reservationDate])
   @@map("reservations")
 }
 
@@ -117,9 +115,9 @@ model ReservationUser {
   reservationId String   @map("reservation_id")
   userId        String   @map("user_id")
   isPrimary     Boolean  @default(false) @map("is_primary")
-  canModify     Boolean  @default(false) @map("can_modify")
-  canTransfer   Boolean  @default(false) @map("can_transfer")
+  status        ReservationUserStatus @default(ACTIVE)  // Add this to track individual statuses
   addedAt       DateTime @default(now()) @map("added_at")
+  cancelledAt   DateTime? @map("cancelled_at")
 
   // Relations
   reservation    Reservation @relation(fields: [reservationId], references: [id])
@@ -127,6 +125,16 @@ model ReservationUser {
 
   @@id([reservationId, userId])
   @@map("reservation_users")
+}
+
+enum ReservationStatus {
+  ACTIVE
+  CANCELLED
+}
+
+enum ReservationUserStatus {
+  ACTIVE
+  CANCELLED
 }
 
 model ReservationTransfer {
@@ -155,19 +163,4 @@ model DateCapacity {
   reservations   Reservation[]
 
   @@map("date_capacities")
-}
-
-model ReservationCancellation {
-  id            String   @id @default(uuid())
-  reservationId String   @unique @map("reservation_id")
-  userId        String   @map("user_id")
-  cancelledAt   DateTime @default(now()) @map("cancelled_at")
-  reason        String?
-  refundIssued  Boolean  @default(false) @map("refund_issued")
-
-  // Relations
-  reservation   Reservation @relation(fields: [reservationId], references: [id])
-  user          User       @relation(fields: [userId], references: [id])
-
-  @@map("reservation_cancellations")
 }
