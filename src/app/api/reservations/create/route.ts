@@ -1,13 +1,13 @@
 // src/app/api/reservations/create/route.ts
 import { ReservationStatus, ReservationUserStatus } from "@prisma/client";
 import { startOfDay } from "date-fns";
-import { NextResponse, type NextRequest } from "next/server";
+import { type NextRequest } from "next/server";
 import { getServerSession } from "next-auth";
 import { z } from "zod";
 
 import { HTTP_STATUS } from "@/constants/http";
+import { createSuccessResponse } from "@/lib/api/responseWrappers";
 import { withErrorHandler } from "@/lib/api/withErrorHandler";
-import type { ApiResponse } from "@/lib/api/withErrorHandler";
 import { authOptions } from "@/lib/auth";
 import {
   AuthenticationError,
@@ -216,14 +216,6 @@ export const POST = withErrorHandler<ReservationResponse>(
       return mappedReservation;
     });
 
-    // Update the return statement to match ApiResponse type
-    const apiResponse: ApiResponse<ReservationResponse> = {
-      data: reservation, // If successful, include data
-      success: true,
-    };
-
-    return NextResponse.json(apiResponse, {
-      status: HTTP_STATUS.CREATED,
-    });
+    return createSuccessResponse(reservation, HTTP_STATUS.CREATED);
   },
 );

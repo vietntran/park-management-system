@@ -1,15 +1,14 @@
 // src/app/api/reservations/check-availability/route.ts
 import { startOfDay } from "date-fns";
-import { NextResponse, NextRequest } from "next/server";
+import { type NextRequest } from "next/server";
 import { getServerSession } from "next-auth";
 
 import { HTTP_STATUS } from "@/constants/http";
 import {
-  withErrorHandler,
-  ErrorResponse,
-  SuccessResponse,
-} from "@/lib/api/withErrorHandler";
-import type { ApiResponse } from "@/lib/api/withErrorHandler";
+  createSuccessResponse,
+  createErrorResponse,
+} from "@/lib/api/responseWrappers";
+import { withErrorHandler } from "@/lib/api/withErrorHandler";
 import { authOptions } from "@/lib/auth";
 import { ValidationError, ConflictError } from "@/lib/errors/ApplicationErrors";
 import logger from "@/lib/logger";
@@ -53,14 +52,10 @@ export const GET = withErrorHandler<AvailabilityResponse>(
         date: checkDate,
       });
 
-      const apiResponse: ErrorResponse = {
-        success: false,
-        error: "Reservations can be made up to 11:59 PM for the following day",
-      };
-
-      return NextResponse.json(apiResponse, {
-        status: HTTP_STATUS.BAD_REQUEST,
-      });
+      return createErrorResponse(
+        "Reservations can be made up to 11:59 PM for the following day",
+        HTTP_STATUS.BAD_REQUEST,
+      );
     }
 
     // If user is logged in, check consecutive dates restriction
@@ -69,14 +64,7 @@ export const GET = withErrorHandler<AvailabilityResponse>(
         await validateConsecutiveDates(session.user.id, checkDate);
       } catch (error) {
         if (error instanceof ConflictError) {
-          const apiResponse: ErrorResponse = {
-            success: false,
-            error: error.message,
-          };
-
-          return NextResponse.json(apiResponse, {
-            status: HTTP_STATUS.CONFLICT,
-          });
+          return createErrorResponse(error.message, HTTP_STATUS.CONFLICT);
         }
         throw error;
       }
@@ -98,18 +86,14 @@ export const GET = withErrorHandler<AvailabilityResponse>(
         date: checkDate,
       });
 
-      const apiResponse: SuccessResponse<AvailabilityResponse> = {
-        data: {
+      return createSuccessResponse(
+        {
           date: checkDate.toISOString(),
           isAvailable: true,
           remainingSpots: MAX_CAPACITY,
         },
-        success: true,
-      };
-
-      return NextResponse.json(apiResponse, {
-        status: HTTP_STATUS.OK,
-      });
+        HTTP_STATUS.OK,
+      );
     }
 
     const remainingSpots =
@@ -123,22 +107,20 @@ export const GET = withErrorHandler<AvailabilityResponse>(
       remainingSpots,
     });
 
-    const apiResponse: ApiResponse<AvailabilityResponse> = isAvailable
-      ? {
-          success: true as const,
-          data: {
-            date: checkDate.toISOString(),
-            isAvailable,
-            remainingSpots,
-          },
-        }
-      : {
-          success: false as const,
-          error: "No available spots for this date",
-        };
+    if (!isAvailable) {
+      return createErrorResponse(
+        "No available spots for this date",
+        HTTP_STATUS.CONFLICT,
+      );
+    }
 
-    return NextResponse.json(apiResponse, {
-      status: isAvailable ? HTTP_STATUS.OK : HTTP_STATUS.CONFLICT,
-    });
+    return createSuccessResponse(
+      {
+        date: checkDate.toISOString(),
+        isAvailable,
+        remainingSpots,
+      },
+      HTTP_STATUS.OK,
+    );
   },
 );
