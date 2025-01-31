@@ -44,7 +44,14 @@ export type ReservationFormData = {
 
 // API Response types
 export interface AvailabilityResponse {
-  availableDates: string[];
+  date: string;
+  isAvailable: boolean;
+  remainingSpots: number;
+  error?: string;
+}
+
+export interface AvailabilityRangeResponse {
+  dates: AvailabilityResponse[];
   error?: string;
 }
 
@@ -78,15 +85,6 @@ export interface ErrorStates {
   userReservationsError: string | null;
   validationError: string | null;
   submissionError: string | null;
-}
-
-export interface ReservationUser {
-  reservationId: string;
-  userId: string;
-  isPrimary: boolean;
-  status: ReservationUserStatus;
-  addedAt: Date;
-  cancelledAt: Date | null;
 }
 
 export interface CancellationResponse {

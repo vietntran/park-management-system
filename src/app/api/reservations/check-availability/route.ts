@@ -1,22 +1,22 @@
+// src/app/api/reservations/check-availability/route.ts
 import { startOfDay } from "date-fns";
 import { NextResponse, NextRequest } from "next/server";
 import { getServerSession } from "next-auth";
 
-import { withErrorHandler } from "@/lib/api/withErrorHandler";
+import { HTTP_STATUS } from "@/constants/http";
+import {
+  withErrorHandler,
+  ErrorResponse,
+  SuccessResponse,
+} from "@/lib/api/withErrorHandler";
+import type { ApiResponse } from "@/lib/api/withErrorHandler";
 import { authOptions } from "@/lib/auth";
 import { ValidationError, ConflictError } from "@/lib/errors/ApplicationErrors";
 import logger from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
 import { validateConsecutiveDates } from "@/lib/validations/reservation";
+import type { AvailabilityResponse } from "@/types/reservation";
 import { isBeforeNextDay } from "@/utils/reservationValidation";
-
-// Define response interface for type safety
-interface AvailabilityResponse {
-  isAvailable: boolean;
-  totalBookings: number;
-  remainingSpots: number;
-  reason?: string;
-}
 
 export const GET = withErrorHandler<AvailabilityResponse>(
   async (req: NextRequest) => {
@@ -53,11 +53,13 @@ export const GET = withErrorHandler<AvailabilityResponse>(
         date: checkDate,
       });
 
-      return NextResponse.json({
-        isAvailable: false,
-        totalBookings: 0,
-        remainingSpots: 0,
-        reason: "Reservations can be made up to 11:59 PM for the following day",
+      const apiResponse: ErrorResponse = {
+        success: false,
+        error: "Reservations can be made up to 11:59 PM for the following day",
+      };
+
+      return NextResponse.json(apiResponse, {
+        status: HTTP_STATUS.BAD_REQUEST,
       });
     }
 
@@ -67,16 +69,20 @@ export const GET = withErrorHandler<AvailabilityResponse>(
         await validateConsecutiveDates(session.user.id, checkDate);
       } catch (error) {
         if (error instanceof ConflictError) {
-          return NextResponse.json({
-            isAvailable: false,
-            totalBookings: 0,
-            remainingSpots: 0,
-            reason: error.message,
+          const apiResponse: ErrorResponse = {
+            success: false,
+            error: error.message,
+          };
+
+          return NextResponse.json(apiResponse, {
+            status: HTTP_STATUS.CONFLICT,
           });
         }
         throw error;
       }
     }
+
+    const MAX_CAPACITY = 60; // Consider moving this to a constant or env variable
 
     // Check existing capacity for the date
     const dateCapacity = await prisma.dateCapacity.findUnique({
@@ -92,16 +98,23 @@ export const GET = withErrorHandler<AvailabilityResponse>(
         date: checkDate,
       });
 
-      return NextResponse.json({
-        isAvailable: true,
-        totalBookings: 0,
-        remainingSpots: 60, // Consider moving this to a constant or env variable
+      const apiResponse: SuccessResponse<AvailabilityResponse> = {
+        data: {
+          date: checkDate.toISOString(),
+          isAvailable: true,
+          remainingSpots: MAX_CAPACITY,
+        },
+        success: true,
+      };
+
+      return NextResponse.json(apiResponse, {
+        status: HTTP_STATUS.OK,
       });
     }
 
-    const isAvailable = dateCapacity.totalBookings < dateCapacity.maxCapacity;
     const remainingSpots =
       dateCapacity.maxCapacity - dateCapacity.totalBookings;
+    const isAvailable = dateCapacity.totalBookings < dateCapacity.maxCapacity;
 
     logger.info("Availability checked successfully", {
       requestId,
@@ -110,11 +123,22 @@ export const GET = withErrorHandler<AvailabilityResponse>(
       remainingSpots,
     });
 
-    return NextResponse.json({
-      isAvailable,
-      totalBookings: dateCapacity.totalBookings,
-      remainingSpots,
-      reason: !isAvailable ? "No available spots for this date" : undefined,
+    const apiResponse: ApiResponse<AvailabilityResponse> = isAvailable
+      ? {
+          success: true as const,
+          data: {
+            date: checkDate.toISOString(),
+            isAvailable,
+            remainingSpots,
+          },
+        }
+      : {
+          success: false as const,
+          error: "No available spots for this date",
+        };
+
+    return NextResponse.json(apiResponse, {
+      status: isAvailable ? HTTP_STATUS.OK : HTTP_STATUS.CONFLICT,
     });
   },
 );
