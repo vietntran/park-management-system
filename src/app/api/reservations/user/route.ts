@@ -1,72 +1,97 @@
 // src/app/api/reservations/user/route.ts
+import { ReservationStatus, ReservationUserStatus } from "@prisma/client";
+import { startOfDay } from "date-fns";
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 
+import { HTTP_STATUS } from "@/constants/http";
+import { withErrorHandler } from "@/lib/api/withErrorHandler";
+import type { ApiResponse } from "@/lib/api/withErrorHandler";
 import { authOptions } from "@/lib/auth";
-import {
-  AuthenticationError,
-  NotFoundError,
-} from "@/lib/errors/ApplicationErrors";
-import { handleServerError } from "@/lib/errors/serverErrorHandler";
+import { AuthenticationError } from "@/lib/errors/ApplicationErrors";
 import { prisma } from "@/lib/prisma";
+import type { ReservationResponse } from "@/types/reservation";
 
-export async function GET() {
-  try {
-    // Get authenticated user
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.email) {
-      throw new AuthenticationError();
-    }
+export const GET = withErrorHandler<ReservationResponse[]>(async () => {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    throw new AuthenticationError();
+  }
 
-    // Find user by email
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-    });
+  // Get today's date at start of day for comparison
+  const today = startOfDay(new Date());
 
-    if (!user) {
-      throw new NotFoundError("User not found");
-    }
-
-    // Get today's date at start of day for comparison
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    // Get all reservations where user is either primary user or additional user
-    const reservations = await prisma.reservation.findMany({
-      where: {
-        OR: [
-          { primaryUserId: user.id },
-          {
-            reservationUsers: {
-              some: {
-                userId: user.id,
-              },
+  // Get all active reservations where user is either primary user or additional user
+  const reservations = await prisma.reservation.findMany({
+    where: {
+      OR: [
+        { primaryUserId: session.user.id },
+        {
+          reservationUsers: {
+            some: {
+              userId: session.user.id,
+              status: ReservationUserStatus.ACTIVE,
             },
           },
-        ],
-        AND: [{ isCancelled: false }, { reservationDate: { gte: today } }],
+        },
+      ],
+      status: ReservationStatus.ACTIVE,
+      reservationDate: { gte: today },
+    },
+    orderBy: {
+      reservationDate: "asc",
+    },
+    include: {
+      reservationUsers: {
+        include: {
+          user: {
+            select: {
+              name: true,
+              email: true,
+            },
+          },
+        },
       },
-      orderBy: {
-        reservationDate: "asc",
-      },
-      select: {
-        reservationDate: true,
-      },
-    });
+      dateCapacity: true,
+    },
+  });
 
-    // Format the dates
-    const formattedDates = reservations.map(
-      (reservation) => reservation.reservationDate,
-    );
+  // Map the reservations to match the ReservationResponse type
+  const mappedReservations: ReservationResponse[] = reservations.map(
+    (reservation) => ({
+      id: reservation.id,
+      primaryUserId: reservation.primaryUserId,
+      reservationDate: reservation.reservationDate,
+      createdAt: reservation.createdAt,
+      status: reservation.status,
+      canTransfer: reservation.canTransfer,
+      reservationUsers: reservation.reservationUsers.map((ru) => ({
+        reservationId: ru.reservationId,
+        userId: ru.userId,
+        isPrimary: ru.isPrimary,
+        status: ru.status,
+        addedAt: ru.addedAt,
+        cancelledAt: ru.cancelledAt,
+        user: {
+          name: ru.user.name,
+          email: ru.user.email,
+        },
+      })),
+      dateCapacity: {
+        totalBookings: reservation.dateCapacity?.totalBookings ?? 0,
+        remainingSpots:
+          (reservation.dateCapacity?.maxCapacity ?? 0) -
+          (reservation.dateCapacity?.totalBookings ?? 0),
+      },
+    }),
+  );
 
-    return NextResponse.json({
-      reservations: formattedDates,
-      count: formattedDates.length,
-    });
-  } catch (error) {
-    return handleServerError(error, {
-      path: "/api/reservations/user",
-      method: "GET",
-    });
-  }
-}
+  const apiResponse: ApiResponse<ReservationResponse[]> = {
+    data: mappedReservations,
+    success: true,
+  };
+
+  return NextResponse.json(apiResponse, {
+    status: HTTP_STATUS.OK,
+  });
+});
