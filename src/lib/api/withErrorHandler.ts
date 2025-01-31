@@ -1,20 +1,28 @@
+// src/lib/api/withErrorHandler.ts
 import { NextRequest, NextResponse } from "next/server";
 
 import { handleServerError } from "@/lib/errors/serverErrorHandler";
 import { RouteContext } from "@/types/route";
 
 // Define the error response type
-interface ErrorResponse {
+export interface ErrorResponse {
+  success: false;
   error: string;
   details?: unknown;
   code?: string;
 }
 
-// Define response type that can be either success (T) or error
-type ApiResponse<T> = T | ErrorResponse;
+// Define the success response type
+export interface SuccessResponse<T> {
+  success: true;
+  data: T;
+}
+
+// Define response type that can be either success or error
+export type ApiResponse<T> = SuccessResponse<T> | ErrorResponse;
 
 // Type-safe route handler definition
-type RouteHandler<T> = (
+export type RouteHandler<T> = (
   req: NextRequest,
   context?: RouteContext,
 ) => Promise<NextResponse<ApiResponse<T>>>;

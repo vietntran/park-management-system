@@ -1,4 +1,36 @@
 // src/types/reservation.ts
+import type { ReservationStatus, ReservationUserStatus } from "@prisma/client";
+
+// Re-export Prisma types
+export type { ReservationStatus, ReservationUserStatus };
+
+export interface ReservationUser {
+  reservationId: string;
+  userId: string;
+  isPrimary: boolean;
+  status: ReservationUserStatus;
+  addedAt: Date;
+  cancelledAt: Date | null;
+  user?: {
+    name: string;
+    email: string;
+  };
+}
+
+export interface ReservationResponse {
+  id: string;
+  primaryUserId: string;
+  reservationDate: Date;
+  createdAt: Date;
+  status: ReservationStatus;
+  canTransfer: boolean;
+  reservationUsers: ReservationUser[];
+  dateCapacity: {
+    totalBookings: number;
+    remainingSpots: number;
+  };
+}
+
 export type SelectedUser = {
   id: string;
   name: string;
@@ -46,16 +78,6 @@ export interface ErrorStates {
   userReservationsError: string | null;
   validationError: string | null;
   submissionError: string | null;
-}
-
-export enum ReservationStatus {
-  ACTIVE = "ACTIVE",
-  CANCELLED = "CANCELLED",
-}
-
-export enum ReservationUserStatus {
-  ACTIVE = "ACTIVE",
-  CANCELLED = "CANCELLED",
 }
 
 export interface ReservationUser {

@@ -1,11 +1,13 @@
 // src/app/api/reservations/create/route.ts
+import { ReservationStatus, ReservationUserStatus } from "@prisma/client";
 import { startOfDay } from "date-fns";
-import { NextResponse, NextRequest } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { getServerSession } from "next-auth";
 import { z } from "zod";
 
 import { HTTP_STATUS } from "@/constants/http";
 import { withErrorHandler } from "@/lib/api/withErrorHandler";
+import type { ApiResponse } from "@/lib/api/withErrorHandler";
 import { authOptions } from "@/lib/auth";
 import {
   AuthenticationError,
@@ -15,6 +17,7 @@ import {
 import logger from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
 import { validateConsecutiveDates } from "@/lib/validations/reservation";
+import type { ReservationResponse } from "@/types/reservation";
 
 // Zod schema for request validation
 const createReservationSchema = z.object({
@@ -28,37 +31,11 @@ const createReservationSchema = z.object({
         id: z.string().uuid(),
         name: z.string(),
         email: z.string().email(),
-        canModify: z.boolean(),
-        canTransfer: z.boolean(),
       }),
     )
     .max(3, "Maximum of 3 additional users allowed")
     .optional(),
 });
-
-// Response types
-interface ReservationUser {
-  userId: string;
-  isPrimary: boolean;
-  canModify: boolean;
-  canTransfer: boolean;
-  user: {
-    name: string;
-    email: string;
-  };
-}
-
-interface ReservationResponse {
-  id: string;
-  primaryUserId: string;
-  reservationDate: Date;
-  createdAt: Date;
-  reservationUsers: ReservationUser[];
-  dateCapacity: {
-    totalBookings: number;
-    remainingSpots: number;
-  };
-}
 
 export const POST = withErrorHandler<ReservationResponse>(
   async (req: NextRequest) => {
@@ -121,8 +98,9 @@ export const POST = withErrorHandler<ReservationResponse>(
             },
             reservation: {
               reservationDate: date,
-              isCancelled: false,
+              status: ReservationStatus.ACTIVE,
             },
+            status: ReservationUserStatus.ACTIVE,
           },
         });
 
@@ -172,18 +150,19 @@ export const POST = withErrorHandler<ReservationResponse>(
         data: {
           primaryUserId: session.user.id,
           reservationDate: date,
+          status: ReservationStatus.ACTIVE,
+          canTransfer: true,
           reservationUsers: {
             create: [
               {
                 userId: session.user.id,
                 isPrimary: true,
-                canModify: true,
-                canTransfer: true,
+                status: ReservationUserStatus.ACTIVE,
               },
               ...additionalUsers.map((user) => ({
                 userId: user.id,
-                canModify: user.canModify,
-                canTransfer: user.canTransfer,
+                isPrimary: false,
+                status: ReservationUserStatus.ACTIVE,
               })),
             ],
           },
@@ -209,16 +188,42 @@ export const POST = withErrorHandler<ReservationResponse>(
         additionalUsers: additionalUsers.length,
       });
 
-      // Return enriched response
-      return {
-        ...newReservation,
+      const mappedReservation: ReservationResponse = {
+        id: newReservation.id,
+        primaryUserId: newReservation.primaryUserId,
+        reservationDate: newReservation.reservationDate,
+        createdAt: newReservation.createdAt,
+        status: newReservation.status,
+        canTransfer: newReservation.canTransfer,
+        reservationUsers: newReservation.reservationUsers.map((ru) => ({
+          reservationId: ru.reservationId,
+          userId: ru.userId,
+          isPrimary: ru.isPrimary,
+          status: ru.status,
+          addedAt: ru.addedAt,
+          cancelledAt: ru.cancelledAt,
+          user: {
+            name: ru.user.name,
+            email: ru.user.email,
+          },
+        })),
         dateCapacity: {
           totalBookings: dateCapacity.totalBookings,
           remainingSpots: dateCapacity.maxCapacity - dateCapacity.totalBookings,
         },
       };
+
+      return mappedReservation;
     });
 
-    return NextResponse.json(reservation, { status: HTTP_STATUS.CREATED });
+    // Update the return statement to match ApiResponse type
+    const apiResponse: ApiResponse<ReservationResponse> = {
+      data: reservation, // If successful, include data
+      success: true,
+    };
+
+    return NextResponse.json(apiResponse, {
+      status: HTTP_STATUS.CREATED,
+    });
   },
 );
