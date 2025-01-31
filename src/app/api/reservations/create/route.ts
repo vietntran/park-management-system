@@ -6,6 +6,7 @@ import { getServerSession } from "next-auth";
 import { z } from "zod";
 
 import { HTTP_STATUS } from "@/constants/http";
+import { RESERVATION_LIMITS } from "@/constants/reservation";
 import { createSuccessResponse } from "@/lib/api/responseWrappers";
 import { withErrorHandler } from "@/lib/api/withErrorHandler";
 import { authOptions } from "@/lib/auth";
@@ -33,7 +34,10 @@ const createReservationSchema = z.object({
         email: z.string().email(),
       }),
     )
-    .max(3, "Maximum of 3 additional users allowed")
+    .max(
+      RESERVATION_LIMITS.MAX_ADDITIONAL_USERS,
+      `Maximum of ${RESERVATION_LIMITS.MAX_ADDITIONAL_USERS} additional users allowed`,
+    )
     .optional(),
 });
 

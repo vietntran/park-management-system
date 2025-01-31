@@ -1,27 +1,41 @@
 import { addDays, startOfDay } from "date-fns";
 import { headers } from "next/headers";
-import { NextResponse, NextRequest } from "next/server";
+import { type NextRequest } from "next/server";
+import { z } from "zod";
 
 import { HTTP_STATUS } from "@/constants/http";
+import { RESERVATION_LIMITS } from "@/constants/reservation";
+import { createSuccessResponse } from "@/lib/api/responseWrappers";
 import { withErrorHandler } from "@/lib/api/withErrorHandler";
 import { ValidationError } from "@/lib/errors/ApplicationErrors";
 import logger from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
 
-interface AvailabilityResponse {
-  availableDates: Date[];
+// Define a type for the response that extends AvailabilityResponse
+interface AvailabilityRangeData {
+  availableDates: string[];
   maxCapacity: number;
 }
 
-const MAX_DAILY_RESERVATIONS = 60;
+// Zod schema for request validation
+const dateRangeSchema = z.object({
+  start: z.string().refine((date) => {
+    const parsedDate = new Date(date);
+    return !isNaN(parsedDate.getTime());
+  }, "Invalid start date format"),
+  end: z.string().refine((date) => {
+    const parsedDate = new Date(date);
+    return !isNaN(parsedDate.getTime());
+  }, "Invalid end date format"),
+});
 
-export const GET = withErrorHandler<AvailabilityResponse>(
+export const GET = withErrorHandler<AvailabilityRangeData>(
   async (req: NextRequest) => {
     const requestId = crypto.randomUUID();
     const headersList = await headers();
-    const ip = headersList.get("x-forwarded-for") || "unknown";
+    const ip = headersList.get("x-forwarded-for") ?? "unknown";
 
-    // Parse and validate query parameters
+    // Parse query parameters
     const { searchParams } = new URL(req.url);
     const start = searchParams.get("start");
     const end = searchParams.get("end");
@@ -36,20 +50,24 @@ export const GET = withErrorHandler<AvailabilityResponse>(
       throw new ValidationError("Both start and end dates are required");
     }
 
-    // Validate date formats and ranges
-    const startDate = startOfDay(new Date(start));
-    const endDate = startOfDay(new Date(end));
-
-    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
-      logger.warn("Invalid date format for availability check", {
+    // Validate request parameters
+    const result = dateRangeSchema.safeParse({ start, end });
+    if (!result.success) {
+      logger.warn("Invalid date parameters for availability check", {
         requestId,
         ip,
         start,
         end,
+        errors: result.error.errors,
       });
-      throw new ValidationError("Invalid date format");
+      throw new ValidationError(result.error.message);
     }
 
+    const { start: validatedStart, end: validatedEnd } = result.data;
+    const startDate = startOfDay(new Date(validatedStart));
+    const endDate = startOfDay(new Date(validatedEnd));
+
+    // Additional date range validation
     if (startDate > endDate) {
       logger.warn("Invalid date range for availability check", {
         requestId,
@@ -89,28 +107,30 @@ export const GET = withErrorHandler<AvailabilityResponse>(
     }
 
     // Filter available dates (less than max capacity)
-    const availableDates = allDates.filter((date) => {
-      const bookings = bookingsMap.get(date.toISOString()) || 0;
-      return bookings < MAX_DAILY_RESERVATIONS;
-    });
+    const availableDates = allDates
+      .filter((date) => {
+        const bookings = bookingsMap.get(date.toISOString()) ?? 0;
+        return bookings < RESERVATION_LIMITS.MAX_DAILY_RESERVATIONS;
+      })
+      .map((date) => date.toISOString());
 
     logger.info("Availability check completed", {
       requestId,
       ip,
       dateRange: {
-        start: startDate,
-        end: endDate,
+        start: startDate.toISOString(),
+        end: endDate.toISOString(),
       },
       availableDatesCount: availableDates.length,
       totalDatesRequested: allDates.length,
     });
 
-    return NextResponse.json(
+    return createSuccessResponse(
       {
         availableDates,
-        maxCapacity: MAX_DAILY_RESERVATIONS,
+        maxCapacity: RESERVATION_LIMITS.MAX_DAILY_RESERVATIONS,
       },
-      { status: HTTP_STATUS.OK },
+      HTTP_STATUS.OK,
     );
   },
 );

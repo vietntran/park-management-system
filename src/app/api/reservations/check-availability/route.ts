@@ -4,6 +4,7 @@ import { type NextRequest } from "next/server";
 import { getServerSession } from "next-auth";
 
 import { HTTP_STATUS } from "@/constants/http";
+import { RESERVATION_LIMITS } from "@/constants/reservation";
 import {
   createSuccessResponse,
   createErrorResponse,
@@ -70,8 +71,6 @@ export const GET = withErrorHandler<AvailabilityResponse>(
       }
     }
 
-    const MAX_CAPACITY = 60; // Consider moving this to a constant or env variable
-
     // Check existing capacity for the date
     const dateCapacity = await prisma.dateCapacity.findUnique({
       where: {
@@ -90,7 +89,7 @@ export const GET = withErrorHandler<AvailabilityResponse>(
         {
           date: checkDate.toISOString(),
           isAvailable: true,
-          remainingSpots: MAX_CAPACITY,
+          remainingSpots: RESERVATION_LIMITS.MAX_DAILY_RESERVATIONS,
         },
         HTTP_STATUS.OK,
       );
