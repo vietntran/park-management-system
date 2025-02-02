@@ -1,9 +1,11 @@
-// src/types/reservation.ts
 import type { ReservationStatus, ReservationUserStatus } from "@prisma/client";
+
+import type { ApiResponse } from "./api";
 
 // Re-export Prisma types
 export type { ReservationStatus, ReservationUserStatus };
 
+// Base types
 export interface ReservationUser {
   reservationId: string;
   userId: string;
@@ -17,7 +19,7 @@ export interface ReservationUser {
   };
 }
 
-export interface ReservationResponse {
+export interface Reservation {
   id: string;
   primaryUserId: string;
   reservationDate: Date;
@@ -31,67 +33,35 @@ export interface ReservationResponse {
   };
 }
 
-export type SelectedUser = {
+// User selection types
+export interface SelectedUser {
   id: string;
   name: string;
   email: string;
-};
+}
 
-export type ReservationFormData = {
+// Form types
+export interface ReservationFormData {
   reservationDate: Date;
   additionalUsers: SelectedUser[];
-};
+}
 
-// API Response types
-export interface AvailabilityResponse {
+// Availability types
+export interface Availability {
   date: string;
   isAvailable: boolean;
   remainingSpots: number;
-  error?: string;
 }
 
-export interface AvailabilityRangeResponse {
-  dates: AvailabilityResponse[];
-  error?: string;
-}
+// API Response types
+export type ReservationResponse = ApiResponse<Reservation>;
+export type AvailabilityResponse = ApiResponse<Availability>;
+export type AvailabilityRangeResponse = ApiResponse<Availability[]>;
+export type UserReservationsResponse = ApiResponse<string[]>;
+export type UserValidationResponse = ApiResponse<{ valid: boolean }>;
+export type CancellationResponse = ApiResponse<null>;
 
-export interface UserReservationsResponse {
-  reservations: string[];
-  error?: string;
-}
-
-export interface UserValidationResponse {
-  valid: boolean;
-  error?: string;
-}
-
-export interface ReservationCreationResponse {
-  success: boolean;
-  error?: string;
-  reservationId?: string;
-}
-
-// Loading states
-export interface LoadingStates {
-  isLoadingDates: boolean;
-  isLoadingUserReservations: boolean;
-  isValidatingUsers: boolean;
-  isSubmitting: boolean;
-}
-
-// Error states
-export interface ErrorStates {
-  datesError: string | null;
-  userReservationsError: string | null;
-  validationError: string | null;
-  submissionError: string | null;
-}
-
-export interface CancellationResponse {
-  success: boolean;
-  error?: string;
-}
-
+// Extended types
 export interface ReservationDetails extends ReservationFormData {
   id: string;
   primaryUserId: string;
@@ -99,4 +69,19 @@ export interface ReservationDetails extends ReservationFormData {
   status: ReservationStatus;
   canTransfer: boolean;
   reservationUsers: ReservationUser[];
+}
+
+// UI State types
+export interface LoadingStates {
+  isLoadingDates: boolean;
+  isLoadingUserReservations: boolean;
+  isValidatingUsers: boolean;
+  isSubmitting: boolean;
+}
+
+export interface ErrorStates {
+  datesError: string | null;
+  userReservationsError: string | null;
+  validationError: string | null;
+  submissionError: string | null;
 }

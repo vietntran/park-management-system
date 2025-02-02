@@ -1,4 +1,4 @@
-// src/types/address.ts
+import type { ApiResponse } from "./api";
 
 export interface Address {
   id?: string;
@@ -12,7 +12,7 @@ export interface Address {
   updatedAt?: Date;
 }
 
-// Type for the form input
+// Form types
 export interface AddressInput {
   line1: string;
   line2?: string | null;
@@ -23,15 +23,12 @@ export interface AddressInput {
 
 export type PartialAddress = Partial<Address>;
 
+// UI Component types
 export interface AddressFormProps {
-  address: Partial<Address> | null;
+  address: PartialAddress | null;
   onChange: (field: keyof AddressInput, value: string) => void;
   className?: string;
 }
 
-// Response type for the API
-export interface AddressResponse {
-  success: boolean;
-  data?: Address;
-  error?: string;
-}
+// API Response types
+export type AddressResponse = ApiResponse<Address>;

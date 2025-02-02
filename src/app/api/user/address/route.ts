@@ -1,8 +1,13 @@
+// src/app/api/user/address/route.ts
 import { headers } from "next/headers";
-import { NextResponse, NextRequest } from "next/server";
+import { type NextRequest } from "next/server";
 import { getServerSession } from "next-auth";
 
 import { HTTP_STATUS } from "@/constants/http";
+import {
+  createSuccessResponse,
+  createErrorResponse,
+} from "@/lib/api/responseWrappers";
 import { withErrorHandler } from "@/lib/api/withErrorHandler";
 import { authOptions } from "@/lib/auth";
 import {
@@ -14,25 +19,13 @@ import {
 import logger from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
 import { addressSchema } from "@/lib/validations/auth";
-
-// Response type for address operations
-interface AddressResponse {
-  id: string;
-  userId: string;
-  line1: string;
-  line2: string | null;
-  city: string;
-  state: string;
-  zipCode: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
+import type { AddressResponse } from "@/types/address";
 
 export const POST = withErrorHandler<AddressResponse>(
   async (req: NextRequest) => {
     const requestId = crypto.randomUUID();
     const headersList = await headers();
-    const ip = headersList.get("x-forwarded-for") || "unknown";
+    const ip = headersList.get("x-forwarded-for") ?? "unknown";
 
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
@@ -88,7 +81,10 @@ export const POST = withErrorHandler<AddressResponse>(
       addressId: address.id,
     });
 
-    return NextResponse.json(address, { status: HTTP_STATUS.CREATED });
+    return createSuccessResponse<AddressResponse>(
+      { success: true, data: address },
+      HTTP_STATUS.CREATED,
+    );
   },
 );
 
@@ -96,7 +92,7 @@ export const PUT = withErrorHandler<AddressResponse>(
   async (req: NextRequest) => {
     const requestId = crypto.randomUUID();
     const headersList = await headers();
-    const ip = headersList.get("x-forwarded-for") || "unknown";
+    const ip = headersList.get("x-forwarded-for") ?? "unknown";
 
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
@@ -137,7 +133,10 @@ export const PUT = withErrorHandler<AddressResponse>(
         addressId: address.id,
       });
 
-      return NextResponse.json(address);
+      return createSuccessResponse<AddressResponse>(
+        { success: true, data: address },
+        HTTP_STATUS.OK,
+      );
     } catch (err) {
       // Type guard for Prisma error with code
       if (err && typeof err === "object" && "code" in err) {
@@ -148,8 +147,9 @@ export const PUT = withErrorHandler<AddressResponse>(
             ip,
             userId: session.user.id,
           });
-          throw new NotFoundError(
+          return createErrorResponse(
             "Address not found. Use POST to create a new address.",
+            HTTP_STATUS.NOT_FOUND,
           );
         }
       }
@@ -161,7 +161,7 @@ export const PUT = withErrorHandler<AddressResponse>(
 export const GET = withErrorHandler<AddressResponse>(async () => {
   const requestId = crypto.randomUUID();
   const headersList = await headers();
-  const ip = headersList.get("x-forwarded-for") || "unknown";
+  const ip = headersList.get("x-forwarded-for") ?? "unknown";
 
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
@@ -181,5 +181,8 @@ export const GET = withErrorHandler<AddressResponse>(async () => {
     throw new NotFoundError("Address not found");
   }
 
-  return NextResponse.json(address);
+  return createSuccessResponse<AddressResponse>(
+    { success: true, data: address },
+    HTTP_STATUS.OK,
+  );
 });

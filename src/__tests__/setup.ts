@@ -42,6 +42,18 @@ global.fetch = jest.fn().mockImplementation(() =>
   ),
 );
 
+// src/__tests__/setup.ts
+class MockAbortController {
+  signal = { aborted: false };
+  abort() {
+    this.signal.aborted = true;
+  }
+}
+
+global.AbortController = MockAbortController as any;
+global.Response = jest.fn() as any;
+global.Headers = jest.fn() as any;
+
 // Clean up after each test
 afterEach(() => {
   jest.clearAllMocks();

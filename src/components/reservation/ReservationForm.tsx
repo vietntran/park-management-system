@@ -14,7 +14,12 @@ import { Calendar } from "@/components/ui/calendar/Calendar";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { handleFormError } from "@/lib/errors/clientErrorHandler";
 import { reservationService } from "@/services/reservationService";
-import type { ReservationFormData, SelectedUser } from "@/types/reservation";
+import type {
+  Reservation,
+  ReservationFormData,
+  ReservationResponse,
+  SelectedUser,
+} from "@/types/reservation";
 import {
   isBeforeNextDay,
   isDateDisabled,
@@ -38,8 +43,6 @@ const reservationSchema = z.object({
         id: z.string(),
         name: z.string(),
         email: z.string().email(),
-        canModify: z.boolean(),
-        canTransfer: z.boolean(),
       }),
     )
     .max(3, "Maximum of 4 total users including yourself"),
@@ -69,26 +72,25 @@ export const ReservationForm = () => {
 
   const loadUserReservations = useCallback(async (signal?: AbortSignal) => {
     setIsLoadingUserReservations(true);
-    try {
-      const response = await reservationService.getUserReservations(signal);
-      // Only update state if the request wasn't aborted
-      if (!signal?.aborted) {
-        setUserReservations(response.reservations.map((d) => new Date(d)));
-        setError(null);
-      }
-    } catch (err) {
-      // Only set error if request wasn't aborted
-      if (!signal?.aborted) {
-        setError(handleFormError(err));
-      }
-    } finally {
-      if (!signal?.aborted) {
-        setIsLoadingUserReservations(false);
-      }
+
+    const response = await reservationService.getUserReservations(signal);
+
+    if (!signal?.aborted) {
+      setUserReservations(
+        response
+          .filter(
+            (
+              reservation,
+            ): reservation is ReservationResponse & { data: Reservation } =>
+              reservation.success && !!reservation.data,
+          )
+          .map((reservation) => new Date(reservation.data.reservationDate)),
+      );
+      setIsLoadingUserReservations(false);
     }
   }, []);
 
-  const loadAvailableDates = useCallback(async () => {
+  const loadAvailableDates = useCallback(async (signal?: AbortSignal) => {
     setIsLoadingDates(true);
     try {
       const startDate = new Date();
@@ -96,19 +98,36 @@ export const ReservationForm = () => {
       const response = await reservationService.getAvailableDates(
         startDate,
         endDate,
+        signal,
       );
-      setAvailableDates(response.availableDates.map((d) => new Date(d)));
-      setError(null);
+
+      if (!signal?.aborted) {
+        // Convert ISO date strings to Date objects
+        setAvailableDates(
+          response.availableDates.map((date) => new Date(date)),
+        );
+        setError(null);
+      }
     } catch (err) {
-      setError(handleFormError(err));
+      if (!signal?.aborted) {
+        setError(handleFormError(err));
+      }
     } finally {
-      setIsLoadingDates(false);
+      if (!signal?.aborted) {
+        setIsLoadingDates(false);
+      }
     }
   }, []);
 
   useEffect(() => {
-    loadAvailableDates();
-    loadUserReservations();
+    const abortController = new AbortController();
+
+    loadAvailableDates(abortController.signal);
+    loadUserReservations(abortController.signal);
+
+    return () => {
+      abortController.abort();
+    };
   }, [loadAvailableDates, loadUserReservations]);
 
   const validateUsers = async (users: SelectedUser[]): Promise<boolean> => {
@@ -116,7 +135,8 @@ export const ReservationForm = () => {
     try {
       const response = await reservationService.validateUsers(users);
       setError(null);
-      return response.valid;
+      // Access the valid property through response.data
+      return (response.success && response.data?.valid) || false;
     } catch (err) {
       setError(handleFormError(err));
       return false;

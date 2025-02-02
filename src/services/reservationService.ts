@@ -4,10 +4,8 @@ import {
   handleClientError,
 } from "@/lib/errors/clientErrorHandler";
 import type {
-  AvailabilityResponse,
-  UserReservationsResponse,
   UserValidationResponse,
-  ReservationCreationResponse,
+  ReservationResponse,
   ReservationFormData,
   SelectedUser,
 } from "@/types/reservation";
@@ -16,10 +14,12 @@ export const reservationService = {
   async getAvailableDates(
     startDate: Date,
     endDate: Date,
-  ): Promise<AvailabilityResponse> {
+    signal?: AbortSignal,
+  ): Promise<{ availableDates: string[]; maxCapacity: number }> {
     try {
       const response = await fetch(
         `/api/reservations/availability?start=${startDate.toISOString()}&end=${endDate.toISOString()}`,
+        { signal },
       );
       if (!response.ok) {
         await handleApiError(response);
@@ -41,7 +41,7 @@ export const reservationService = {
 
   async getUserReservations(
     signal?: AbortSignal,
-  ): Promise<UserReservationsResponse> {
+  ): Promise<ReservationResponse[]> {
     try {
       const response = await fetch("/api/reservations/user", { signal });
       if (!response.ok) {
@@ -114,7 +114,7 @@ export const reservationService = {
 
   async createReservation(
     data: ReservationFormData,
-  ): Promise<ReservationCreationResponse> {
+  ): Promise<ReservationResponse> {
     try {
       const response = await fetch("/api/reservations/create", {
         method: "POST",
