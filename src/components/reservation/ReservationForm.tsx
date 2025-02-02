@@ -73,20 +73,33 @@ export const ReservationForm = () => {
   const loadUserReservations = useCallback(async (signal?: AbortSignal) => {
     setIsLoadingUserReservations(true);
 
-    const response = await reservationService.getUserReservations(signal);
+    try {
+      const response = await reservationService.getUserReservations(signal);
 
-    if (!signal?.aborted) {
-      setUserReservations(
-        response
-          .filter(
-            (
-              reservation,
-            ): reservation is ReservationResponse & { data: Reservation } =>
-              reservation.success && !!reservation.data,
-          )
-          .map((reservation) => new Date(reservation.data.reservationDate)),
-      );
-      setIsLoadingUserReservations(false);
+      if (!signal?.aborted) {
+        if (response.success) {
+          setUserReservations(
+            response.data
+              .filter(
+                (
+                  reservation,
+                ): reservation is ReservationResponse & { data: Reservation } =>
+                  !!reservation.data,
+              )
+              .map((reservation) => new Date(reservation.data.reservationDate)),
+          );
+        } else {
+          throw new Error(response.error);
+        }
+      }
+    } catch (err) {
+      if (!signal?.aborted) {
+        setError(handleFormError(err));
+      }
+    } finally {
+      if (!signal?.aborted) {
+        setIsLoadingUserReservations(false);
+      }
     }
   }, []);
 
@@ -102,11 +115,14 @@ export const ReservationForm = () => {
       );
 
       if (!signal?.aborted) {
-        // Convert ISO date strings to Date objects
-        setAvailableDates(
-          response.availableDates.map((date) => new Date(date)),
-        );
-        setError(null);
+        if (response.success) {
+          setAvailableDates(
+            response.data.availableDates.map((date) => new Date(date)),
+          );
+          setError(null);
+        } else {
+          throw new Error(response.error);
+        }
       }
     } catch (err) {
       if (!signal?.aborted) {
@@ -135,8 +151,11 @@ export const ReservationForm = () => {
     try {
       const response = await reservationService.validateUsers(users);
       setError(null);
-      // Access the valid property through response.data
-      return (response.success && response.data?.valid) || false;
+      if (response.success) {
+        return response.data.valid;
+      } else {
+        throw new Error(response.error);
+      }
     } catch (err) {
       setError(handleFormError(err));
       return false;
@@ -163,15 +182,18 @@ export const ReservationForm = () => {
       const availability = await reservationService.checkDateAvailability(
         data.reservationDate,
       );
-      if (!availability.isAvailable) {
-        throw new Error(availability.reason || "Date is not available");
+      if (!availability.success) {
+        throw new Error(availability.error);
+      }
+      if (!availability.data.isAvailable) {
+        throw new Error(availability.data.reason || "Date is not available");
       }
 
       const response = await reservationService.createReservation(data);
       if (response.success) {
         router.push("/dashboard?status=success&message=reservation-created");
       } else {
-        throw new Error(response.error || "Failed to create reservation");
+        throw new Error(response.error);
       }
     } catch (err) {
       setError(handleFormError(err));
@@ -204,7 +226,11 @@ export const ReservationForm = () => {
         <h2 className="text-2xl font-bold text-center">Make a Reservation</h2>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+        <form
+          onSubmit={handleSubmit(onSubmit)}
+          className="space-y-6"
+          aria-label="reservation-form"
+        >
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-medium">Select Date</h3>

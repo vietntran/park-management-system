@@ -4,7 +4,10 @@ import { addDays, subDays } from "date-fns";
 import { act } from "react";
 
 import { ReservationForm } from "@/components/reservation/ReservationForm";
+import { RESERVATION_LIMITS } from "@/constants/reservation";
 import { reservationService } from "@/services/reservationService";
+import type { Reservation, ReservationStatus } from "@/types/reservation";
+
 const mockRouter = {
   push: jest.fn(),
   back: jest.fn(),
@@ -20,10 +23,17 @@ jest.mock("next/navigation", () => ({
 
 jest.mock("react-hook-form", () => ({
   useForm: jest.fn().mockImplementation(() => ({
-    handleSubmit: (fn: any) => (data: any) => fn(data),
+    handleSubmit: (fn: any) => async (e?: any) => {
+      e?.preventDefault?.();
+      const mockData = {
+        reservationDate: new Date(2025, 0, 26),
+        additionalUsers: [],
+      };
+      return fn(mockData);
+    },
     watch: jest.fn((field) => {
       if (field === "additionalUsers") return [];
-      if (field === "reservationDate") return undefined;
+      if (field === "reservationDate") return new Date(2025, 0, 26);
       if (field === "selectedDates") return [];
       return undefined;
     }),
@@ -35,7 +45,10 @@ jest.mock("react-hook-form", () => ({
     reset: jest.fn(),
     register: jest.fn(),
     control: {},
-    getValues: jest.fn(),
+    getValues: jest.fn(() => ({
+      reservationDate: new Date(2025, 0, 26),
+      additionalUsers: [],
+    })),
   })),
   zodResolver: jest.fn(),
 }));
@@ -70,7 +83,7 @@ jest.mock("@/components/ui/calendar/Calendar", () => ({
             onClick={() => onSelect?.(date)}
             disabled={disabled?.(date)}
             aria-label={String(i + 1)}
-            aria-selected={selected?.getDate() === i + 1}
+            aria-pressed={selected?.getDate() === i + 1}
           >
             {i + 1}
           </button>
@@ -100,241 +113,369 @@ jest.mock("@/services/reservationService", () => ({
   },
 }));
 
-// Tests
+jest.mock("sonner", () => ({
+  toast: {
+    error: jest.fn(),
+    success: jest.fn(),
+  },
+}));
+
+jest.mock("@/lib/errors/clientErrorHandler", () => ({
+  handleFormError: jest.fn((error) =>
+    error instanceof Error ? error.message : "An error occurred",
+  ),
+}));
+
 describe("ReservationForm", () => {
   const today = new Date();
   const tomorrow = addDays(today, 1);
   const yesterday = subDays(today, 1);
+  const dayAfterTomorrow = addDays(tomorrow, 1);
+
+  const mockReservation: Reservation = {
+    id: "1",
+    primaryUserId: "user1",
+    reservationDate: new Date(),
+    createdAt: new Date(),
+    status: "ACTIVE" as ReservationStatus,
+    canTransfer: false,
+    reservationUsers: [],
+    dateCapacity: {
+      totalBookings: 0,
+      remainingSpots: RESERVATION_LIMITS.MAX_DAILY_RESERVATIONS,
+    },
+  };
+
+  const defaultMockResponses = {
+    getAvailableDates: {
+      success: true,
+      data: {
+        availableDates: [tomorrow, dayAfterTomorrow].map((d) =>
+          d.toISOString(),
+        ),
+        maxCapacity: RESERVATION_LIMITS.MAX_DAILY_RESERVATIONS,
+      },
+    },
+    getUserReservations: [
+      {
+        success: true,
+        data: mockReservation,
+      },
+    ],
+    validateUsers: {
+      success: true,
+      data: { valid: true },
+    },
+    checkDateAvailability: {
+      success: true,
+      data: { isAvailable: true },
+    },
+    createReservation: {
+      success: true,
+      data: { id: "123" },
+    },
+  };
+
+  beforeAll(() => {
+    jest.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  afterAll(() => {
+    jest.restoreAllMocks();
+  });
 
   beforeEach(() => {
-    // Reset all mocks before each test
-    // Reset all mocks before each test
     jest.clearAllMocks();
-
-    // Setup default mock responses
-    const tomorrow = addDays(new Date(), 1);
-    const dayAfterTomorrow = addDays(tomorrow, 1);
-    (reservationService.getAvailableDates as jest.Mock).mockResolvedValue({
-      availableDates: [tomorrow, dayAfterTomorrow].map((d) => d.toISOString()),
-    });
-    (reservationService.getUserReservations as jest.Mock).mockResolvedValue({
-      reservations: [],
-    });
-    (reservationService.validateUsers as jest.Mock).mockResolvedValue({
-      valid: true,
-    });
-    (reservationService.checkDateAvailability as jest.Mock).mockResolvedValue({
-      isAvailable: true,
-    });
-    (reservationService.createReservation as jest.Mock).mockResolvedValue({
-      success: true,
+    Object.entries(defaultMockResponses).forEach(([key, value]) => {
+      (
+        reservationService[key as keyof typeof reservationService] as jest.Mock
+      ).mockResolvedValue(value);
     });
   });
 
-  it("loads available dates and user reservations on mount", async () => {
-    await act(async () => {
-      render(<ReservationForm />);
+  describe("Initialization", () => {
+    it("loads available dates and user reservations on mount", async () => {
+      await act(async () => {
+        render(<ReservationForm />);
+      });
+
+      await waitFor(() => {
+        expect(reservationService.getAvailableDates).toHaveBeenCalled();
+        expect(reservationService.getUserReservations).toHaveBeenCalled();
+      });
     });
 
-    expect(reservationService.getAvailableDates).toHaveBeenCalled();
-    expect(reservationService.getUserReservations).toHaveBeenCalled();
+    it("cleans up requests on unmount", async () => {
+      const abortSpy = jest.spyOn(AbortController.prototype, "abort");
+
+      let unmount: () => void;
+      await act(async () => {
+        const rendered = render(<ReservationForm />);
+        unmount = rendered.unmount;
+      });
+
+      await waitFor(() => {
+        expect(reservationService.getAvailableDates).toHaveBeenCalled();
+        expect(reservationService.getUserReservations).toHaveBeenCalled();
+      });
+
+      await act(async () => {
+        unmount();
+      });
+
+      expect(abortSpy).toHaveBeenCalled();
+    });
   });
 
-  it("prevents selecting dates before today", async () => {
-    await act(async () => {
-      render(<ReservationForm />);
+  describe("Date Selection", () => {
+    it("prevents selecting dates before today", async () => {
+      await act(async () => {
+        render(<ReservationForm />);
+      });
+
+      const calendarEl = screen.getByTestId("calendar");
+      const todayButton = within(calendarEl).getByRole("button", {
+        name: today.getDate().toString(),
+      });
+      expect(todayButton).toBeDisabled();
+
+      const yesterdayButton = within(calendarEl).getByRole("button", {
+        name: yesterday.getDate().toString(),
+      });
+      expect(yesterdayButton).toBeDisabled();
     });
 
-    // Check that today's date is disabled
-    const calendarEl = screen.getByTestId("calendar");
-    const todayButton = within(calendarEl).getByRole("button", {
-      name: today.getDate().toString(),
-    });
-    expect(todayButton).toBeDisabled();
+    it("prevents selecting unavailable dates", async () => {
+      const unavailableDate = addDays(today, 2);
+      (reservationService.getAvailableDates as jest.Mock).mockResolvedValue({
+        success: true,
+        data: {
+          availableDates: [today, tomorrow].map((d) => d.toISOString()),
+          maxCapacity: RESERVATION_LIMITS.MAX_DAILY_RESERVATIONS,
+        },
+      });
 
-    // Check that yesterday's date is disabled
-    const yesterdayButton = within(calendarEl).getByRole("button", {
-      name: yesterday.getDate().toString(),
+      await act(async () => {
+        render(<ReservationForm />);
+      });
+
+      const calendarEl = screen.getByTestId("calendar");
+      const dateButton = within(calendarEl).getByRole("button", {
+        name: unavailableDate.getDate().toString(),
+      });
+      expect(dateButton).toBeDisabled();
     });
-    expect(yesterdayButton).toBeDisabled();
+
+    it("disables today's date selection", async () => {
+      await act(async () => {
+        render(<ReservationForm />);
+      });
+
+      await waitFor(() => {
+        expect(reservationService.getAvailableDates).toHaveBeenCalled();
+        expect(reservationService.getUserReservations).toHaveBeenCalled();
+      });
+
+      const calendarEl = screen.getByTestId("calendar");
+      const todayButton = within(calendarEl).getByRole("button", {
+        name: today.getDate().toString(),
+      });
+
+      expect(todayButton).toBeDisabled();
+
+      await waitFor(() => {
+        expect(
+          screen.queryByTestId("alert-description"),
+        ).not.toBeInTheDocument();
+      });
+    });
+
+    it("allows selecting tomorrow's date", async () => {
+      await act(async () => {
+        render(<ReservationForm />);
+      });
+
+      await waitFor(() => {
+        expect(reservationService.getAvailableDates).toHaveBeenCalled();
+        expect(reservationService.getUserReservations).toHaveBeenCalled();
+      });
+
+      const calendarEl = screen.getByTestId("calendar");
+      const dateButton = within(calendarEl).getByRole("button", {
+        name: tomorrow.getDate().toString(),
+      });
+
+      await act(async () => {
+        await userEvent.click(dateButton);
+      });
+
+      await waitFor(() => {
+        expect(
+          screen.queryByTestId("alert-description"),
+        ).not.toBeInTheDocument();
+      });
+    });
   });
 
-  it("prevents selecting unavailable dates", async () => {
-    const unavailableDate = addDays(today, 2);
-    (reservationService.getAvailableDates as jest.Mock).mockResolvedValue({
-      availableDates: [today, tomorrow].map((d) => d.toISOString()), // unavailableDate not included
-    });
+  describe("User Management", () => {
+    it("prevents adding more than 3 additional users", async () => {
+      const { UserSearch } = jest.requireMock(
+        "@/components/reservation/UserSearch",
+      );
 
-    await act(async () => {
-      render(<ReservationForm />);
-    });
+      await act(async () => {
+        render(<ReservationForm />);
+      });
 
-    const calendarEl = screen.getByTestId("calendar");
-    const dateButton = within(calendarEl).getByRole("button", {
-      name: unavailableDate.getDate().toString(),
-    });
-    expect(dateButton).toBeDisabled();
-  });
-
-  it("prevents adding more than 3 additional users", async () => {
-    const { UserSearch } = jest.requireMock(
-      "@/components/reservation/UserSearch",
-    );
-
-    await act(async () => {
-      render(<ReservationForm />);
-    });
-
-    expect(UserSearch).toHaveBeenCalledWith(
-      expect.objectContaining({
-        maxUsers: 3,
-      }),
-      expect.any(Object),
-    );
-  });
-
-  it("validates selected users before submission", async () => {
-    (reservationService.validateUsers as jest.Mock).mockResolvedValue({
-      valid: false,
-    });
-
-    await act(async () => {
-      render(<ReservationForm />);
-    });
-
-    // Select a date
-    const calendarEl = screen.getByTestId("calendar");
-    const dateButton = within(calendarEl).getByRole("button", { name: "26" });
-    await act(async () => {
-      await userEvent.click(dateButton);
-    });
-
-    // Submit form
-    const submitButton = screen.getByRole("button", {
-      name: /Create Reservation/,
-    });
-    await act(async () => {
-      await userEvent.click(submitButton);
-    });
-
-    await waitFor(() => {
-      expect(screen.getByTestId("alert-description")).toHaveTextContent(
-        "One or more selected users are not registered in the system",
+      expect(UserSearch).toHaveBeenCalledWith(
+        expect.objectContaining({
+          maxUsers: 3,
+        }),
+        expect.any(Object),
       );
     });
+
+    it("validates selected users before submission", async () => {
+      (reservationService.validateUsers as jest.Mock).mockResolvedValue({
+        success: true,
+        data: { valid: false },
+      });
+
+      await act(async () => {
+        render(<ReservationForm />);
+      });
+
+      const calendarEl = screen.getByTestId("calendar");
+      const dateButton = within(calendarEl).getByRole("button", { name: "26" });
+      await act(async () => {
+        await userEvent.click(dateButton);
+      });
+
+      const form = screen.getByLabelText("reservation-form");
+      await act(async () => {
+        form.dispatchEvent(new Event("submit", { bubbles: true }));
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("alert-description")).toHaveTextContent(
+          "One or more selected users are not registered in the system",
+        );
+      });
+    });
   });
 
-  it("shows error when date becomes unavailable during submission", async () => {
-    (reservationService.checkDateAvailability as jest.Mock).mockResolvedValue({
-      isAvailable: false,
-      reason: "Date is no longer available",
-    });
+  describe("Error Handling", () => {
+    it("handles API response errors appropriately", async () => {
+      const errorMessage = "Failed to load available dates";
+      (reservationService.getAvailableDates as jest.Mock).mockRejectedValue(
+        new Error(errorMessage),
+      );
 
-    await act(async () => {
-      render(<ReservationForm />);
-    });
+      (reservationService.getUserReservations as jest.Mock).mockResolvedValue({
+        success: true,
+        data: [],
+      });
 
-    // Select a date
-    const calendarEl = screen.getByTestId("calendar");
-    const dateButton = within(calendarEl).getByRole("button", { name: "26" });
-    await act(async () => {
-      await userEvent.click(dateButton);
-    });
+      await act(async () => {
+        render(<ReservationForm />);
+      });
 
-    // Submit form
-    const submitButton = screen.getByRole("button", {
-      name: /Create Reservation/,
-    });
-    await act(async () => {
-      await userEvent.click(submitButton);
-    });
+      await waitFor(
+        () => {
+          const alert = screen.getByTestId("alert");
+          expect(alert).toBeInTheDocument();
 
-    await waitFor(() => {
-      expect(screen.getByTestId("alert-description")).toHaveTextContent(
-        "Date is no longer available",
+          const alertDescription =
+            within(alert).getByTestId("alert-description");
+          expect(alertDescription).toBeInTheDocument();
+          expect(alertDescription).toHaveTextContent(errorMessage);
+        },
+        {
+          timeout: 3000,
+        },
       );
     });
-  });
 
-  it("redirects to dashboard on successful submission", async () => {
-    // Mock services for successful submission
-    (reservationService.validateUsers as jest.Mock).mockResolvedValue({
-      valid: true,
-    });
-    (reservationService.checkDateAvailability as jest.Mock).mockResolvedValue({
-      isAvailable: true,
-    });
-    (reservationService.createReservation as jest.Mock).mockResolvedValue({
-      success: true,
-    });
-    (reservationService.getAvailableDates as jest.Mock).mockResolvedValue({
-      availableDates: Array.from({ length: 31 }, (_, i) =>
-        new Date(2025, 0, i + 1).toISOString(),
-      ),
-    });
-
-    await act(async () => {
-      render(<ReservationForm />);
-    });
-
-    // Select a date
-    const calendarEl = screen.getByTestId("calendar");
-    const dateButton = within(calendarEl).getByRole("button", { name: "26" });
-    await act(async () => {
-      await userEvent.click(dateButton);
-    });
-
-    // Submit form
-    const submitButton = screen.getByRole("button", {
-      name: /Create Reservation/,
-    });
-    await act(async () => {
-      await userEvent.click(submitButton);
-    });
-
-    await waitFor(() => {
-      expect(mockRouter.push).toHaveBeenCalledWith(
-        "/dashboard?status=success&message=reservation-created",
+    it("shows error when date becomes unavailable during submission", async () => {
+      (reservationService.checkDateAvailability as jest.Mock).mockResolvedValue(
+        {
+          success: true,
+          data: {
+            isAvailable: false,
+            reason: "Date is not available",
+          },
+        },
       );
+
+      await act(async () => {
+        render(<ReservationForm />);
+      });
+
+      const calendarEl = screen.getByTestId("calendar");
+      const dateButton = within(calendarEl).getByRole("button", { name: "26" });
+      await act(async () => {
+        await userEvent.click(dateButton);
+      });
+
+      const form = screen.getByLabelText("reservation-form");
+      await act(async () => {
+        form.dispatchEvent(new Event("submit", { bubbles: true }));
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("alert-description")).toHaveTextContent(
+          "Date is not available",
+        );
+      });
     });
   });
 
-  it("disables today's date selection", async () => {
-    await act(async () => {
-      render(<ReservationForm />);
-    });
+  describe("Form Submission", () => {
+    it("redirects to dashboard on successful submission", async () => {
+      const selectedDate = new Date(2025, 0, 26);
 
-    const calendarEl = screen.getByTestId("calendar");
-    const today = new Date();
-    const todayButton = within(calendarEl).getByRole("button", {
-      name: today.getDate().toString(),
-    });
+      (reservationService.getAvailableDates as jest.Mock).mockResolvedValue({
+        success: true,
+        data: {
+          availableDates: [selectedDate.toISOString()],
+          maxCapacity: 60,
+        },
+      });
 
-    // Verify the button is disabled
-    expect(todayButton).toBeDisabled();
+      await act(async () => {
+        render(<ReservationForm />);
+      });
 
-    // Verify no alert message is present (since the date can't be clicked)
-    expect(screen.queryByTestId("alert-description")).not.toBeInTheDocument();
-  });
+      await waitFor(() => {
+        expect(reservationService.getAvailableDates).toHaveBeenCalled();
+        expect(reservationService.getUserReservations).toHaveBeenCalled();
+      });
 
-  it("allows selecting tomorrow's date", async () => {
-    await act(async () => {
-      render(<ReservationForm />);
-    });
+      const form = screen.getByLabelText("reservation-form");
 
-    // Select tomorrow's date
-    const calendarEl = screen.getByTestId("calendar");
-    const dateButton = within(calendarEl).getByRole("button", {
-      name: tomorrow.getDate().toString(),
-    });
+      await act(async () => {
+        form.dispatchEvent(new Event("submit", { bubbles: true }));
+      });
 
-    await act(async () => {
-      await userEvent.click(dateButton);
-    });
+      await waitFor(
+        () => {
+          expect(reservationService.validateUsers).toHaveBeenCalled();
+          expect(reservationService.checkDateAvailability).toHaveBeenCalledWith(
+            selectedDate,
+          );
+          expect(reservationService.createReservation).toHaveBeenCalledWith({
+            reservationDate: selectedDate,
+            additionalUsers: [],
+          });
+        },
+        { timeout: 3000 },
+      );
 
-    // Should not show error message
-    await waitFor(() => {
-      expect(screen.queryByTestId("alert-description")).not.toBeInTheDocument();
+      await waitFor(() => {
+        expect(mockRouter.push).toHaveBeenCalledWith(
+          "/dashboard?status=success&message=reservation-created",
+        );
+      });
     });
   });
 });

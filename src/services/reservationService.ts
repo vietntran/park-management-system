@@ -1,21 +1,27 @@
 // src/services/reservationService.ts
+import type { ApiResponse } from "@/lib/api/withErrorHandler";
 import {
   handleApiError,
   handleClientError,
 } from "@/lib/errors/clientErrorHandler";
 import type {
-  UserValidationResponse,
   ReservationResponse,
   ReservationFormData,
   SelectedUser,
 } from "@/types/reservation";
+
+// Define the types for the availability response
+interface AvailabilityRangeData {
+  availableDates: string[];
+  maxCapacity: number;
+}
 
 export const reservationService = {
   async getAvailableDates(
     startDate: Date,
     endDate: Date,
     signal?: AbortSignal,
-  ): Promise<{ availableDates: string[]; maxCapacity: number }> {
+  ): Promise<ApiResponse<AvailabilityRangeData>> {
     try {
       const response = await fetch(
         `/api/reservations/availability?start=${startDate.toISOString()}&end=${endDate.toISOString()}`,
@@ -41,7 +47,7 @@ export const reservationService = {
 
   async getUserReservations(
     signal?: AbortSignal,
-  ): Promise<ReservationResponse[]> {
+  ): Promise<ApiResponse<ReservationResponse[]>> {
     try {
       const response = await fetch("/api/reservations/user", { signal });
       if (!response.ok) {
@@ -62,7 +68,9 @@ export const reservationService = {
     }
   },
 
-  async validateUsers(users: SelectedUser[]): Promise<UserValidationResponse> {
+  async validateUsers(
+    users: SelectedUser[],
+  ): Promise<ApiResponse<{ valid: boolean }>> {
     try {
       const response = await fetch("/api/users/validate", {
         method: "POST",
@@ -89,7 +97,7 @@ export const reservationService = {
 
   async checkDateAvailability(
     date: Date,
-  ): Promise<{ isAvailable: boolean; reason?: string }> {
+  ): Promise<ApiResponse<{ isAvailable: boolean; reason?: string }>> {
     try {
       const response = await fetch(
         `/api/reservations/check-availability?date=${date.toISOString()}`,
@@ -114,7 +122,7 @@ export const reservationService = {
 
   async createReservation(
     data: ReservationFormData,
-  ): Promise<ReservationResponse> {
+  ): Promise<ApiResponse<ReservationResponse>> {
     try {
       const response = await fetch("/api/reservations/create", {
         method: "POST",

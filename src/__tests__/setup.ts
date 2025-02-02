@@ -1,10 +1,16 @@
-// src/__tests__/setup.ts
 import "@testing-library/jest-dom";
 import { TextEncoder, TextDecoder } from "util";
 
 // Need to explicitly cast the global assignment to avoid type mismatches
 global.TextEncoder = TextEncoder as typeof global.TextEncoder;
 global.TextDecoder = TextDecoder as typeof global.TextDecoder;
+
+// Add requestSubmit polyfill for testing form submissions
+if (typeof window !== "undefined") {
+  window.HTMLFormElement.prototype.requestSubmit = function () {
+    this.submit();
+  };
+}
 
 // Mock next/navigation
 jest.mock("next/navigation", () => ({
@@ -42,7 +48,7 @@ global.fetch = jest.fn().mockImplementation(() =>
   ),
 );
 
-// src/__tests__/setup.ts
+// Mock AbortController
 class MockAbortController {
   signal = { aborted: false };
   abort() {
