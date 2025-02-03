@@ -5,7 +5,6 @@ import {
   handleClientError,
 } from "@/lib/errors/clientErrorHandler";
 import type {
-  ReservationResponse,
   ReservationFormData,
   SelectedUser,
   Reservation,
@@ -111,30 +110,16 @@ export const reservationService = {
 
   async createReservation(
     data: ReservationFormData,
-  ): Promise<ApiResponse<ReservationResponse>> {
-    try {
-      const response = await fetch("/api/reservations/create", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) {
-        await handleApiError(response);
-      }
-      return response.json();
-    } catch (error) {
-      handleClientError(
-        error instanceof Error
-          ? error
-          : new Error("Failed to create reservation"),
-        {
-          path: "/api/reservations/create",
-          method: "POST",
-        },
-      );
-      throw error;
-    }
+  ): Promise<ApiResponse<Reservation>> {
+    const response = await fetch("/api/reservations/create", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    });
+
+    const result = await response.json();
+    return result;
   },
 };
