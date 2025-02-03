@@ -61,7 +61,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     throw new ValidationError("Cannot create reservation for past dates");
   }
 
-  // Start a transaction
+  // Start a transaction - handles user verification, date validation, capacity check, and reservation creation
   const reservation = await prisma.$transaction(async (tx) => {
     // Verify all users exist and are verified
     if (additionalUsers.length > 0) {
@@ -120,7 +120,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       await validateConsecutiveDates(user.id, date);
     }
 
-    // Check and update date capacity
+    // Check and update date capacity - ensures spot availability
     let dateCapacity = await tx.dateCapacity.findUnique({
       where: { date },
     });
@@ -148,7 +148,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       });
     }
 
-    // Create the reservation
+    // Create reservation with primary and additional users if any
     const newReservation = await tx.reservation.create({
       data: {
         primaryUserId: session.user.id,
@@ -175,8 +175,11 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
           include: {
             user: {
               select: {
+                id: true,
                 name: true,
                 email: true,
+                emailVerified: true,
+                isProfileComplete: true,
               },
             },
           },
@@ -191,6 +194,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       additionalUsers: additionalUsers.length,
     });
 
+    // Map database response to API response type
     const mappedReservation: Reservation = {
       id: newReservation.id,
       primaryUserId: newReservation.primaryUserId,
@@ -206,8 +210,11 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
         addedAt: ru.addedAt,
         cancelledAt: ru.cancelledAt,
         user: {
+          id: ru.user.id,
           name: ru.user.name,
           email: ru.user.email,
+          emailVerified: ru.user.emailVerified,
+          isProfileComplete: ru.user.isProfileComplete,
         },
       })),
       dateCapacity: {
