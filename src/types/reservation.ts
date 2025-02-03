@@ -62,7 +62,6 @@ export type AvailabilityResponse = ApiResponse<Availability>;
 export type AvailabilityRangeResponse = ApiResponse<Availability[]>;
 export type UserReservationsResponse = ApiResponse<Reservation[]>;
 export type UserValidationResponse = ApiResponse<{ valid: boolean }>;
-export type CancellationResponse = ApiResponse<null>;
 
 // Extended types
 export interface ReservationDetails extends ReservationFormData {

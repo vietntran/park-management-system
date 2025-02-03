@@ -16,7 +16,6 @@ import {
 } from "@/lib/errors/ApplicationErrors";
 import logger from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
-import type { CancellationResponse } from "@/types/reservation";
 import type { RouteContext } from "@/types/route";
 
 // Zod schema for params validation
@@ -24,7 +23,7 @@ const cancelParamsSchema = z.object({
   id: z.string().uuid("Invalid reservation ID format"),
 });
 
-export const POST = withErrorHandler<CancellationResponse>(
+export const POST = withErrorHandler<null>(
   async (req: NextRequest, context?: RouteContext) => {
     const requestId = crypto.randomUUID();
 
@@ -124,13 +123,7 @@ export const POST = withErrorHandler<CancellationResponse>(
           affectedUsers: reservation.reservationUsers.length,
         });
 
-        return createSuccessResponse<CancellationResponse>(
-          {
-            success: true,
-            error: undefined,
-          },
-          HTTP_STATUS.OK,
-        );
+        return createSuccessResponse<null>(null, HTTP_STATUS.OK);
       } else {
         // Non-primary user can only cancel their own spot
         await prisma.$transaction([
@@ -162,13 +155,7 @@ export const POST = withErrorHandler<CancellationResponse>(
           userId: session.user.id,
         });
 
-        return createSuccessResponse<CancellationResponse>(
-          {
-            success: true,
-            error: undefined,
-          },
-          HTTP_STATUS.OK,
-        );
+        return createSuccessResponse<null>(null, HTTP_STATUS.OK);
       }
     } catch (err) {
       const error = err as Error;
