@@ -14,12 +14,7 @@ import { Calendar } from "@/components/ui/calendar/Calendar";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { handleFormError } from "@/lib/errors/clientErrorHandler";
 import { reservationService } from "@/services/reservationService";
-import type {
-  Reservation,
-  ReservationFormData,
-  ReservationResponse,
-  SelectedUser,
-} from "@/types/reservation";
+import type { ReservationFormData, SelectedUser } from "@/types/reservation";
 import {
   isBeforeNextDay,
   isDateDisabled,
@@ -78,17 +73,14 @@ export const ReservationForm = () => {
 
       if (!signal?.aborted) {
         if (response.success) {
+          // Properly narrow the type to ensure response.data is an array of Reservation objects
+          const reservations = response.data;
           setUserReservations(
-            response.data
-              .filter(
-                (
-                  reservation,
-                ): reservation is ReservationResponse & { data: Reservation } =>
-                  !!reservation.data,
-              )
-              .map((reservation) => new Date(reservation.data.reservationDate)),
+            reservations.map(
+              (reservation) => new Date(reservation.reservationDate),
+            ),
           );
-        } else {
+        } else if (!response.success) {
           throw new Error(response.error);
         }
       }

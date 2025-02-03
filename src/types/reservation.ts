@@ -57,7 +57,7 @@ export interface Availability {
 export type ReservationResponse = ApiResponse<Reservation>;
 export type AvailabilityResponse = ApiResponse<Availability>;
 export type AvailabilityRangeResponse = ApiResponse<Availability[]>;
-export type UserReservationsResponse = ApiResponse<string[]>;
+export type UserReservationsResponse = ApiResponse<Reservation[]>;
 export type UserValidationResponse = ApiResponse<{ valid: boolean }>;
 export type CancellationResponse = ApiResponse<null>;
 

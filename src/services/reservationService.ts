@@ -8,6 +8,7 @@ import type {
   ReservationResponse,
   ReservationFormData,
   SelectedUser,
+  Reservation,
 } from "@/types/reservation";
 
 // Define the types for the availability response
@@ -47,25 +48,13 @@ export const reservationService = {
 
   async getUserReservations(
     signal?: AbortSignal,
-  ): Promise<ApiResponse<ReservationResponse[]>> {
-    try {
-      const response = await fetch("/api/reservations/user", { signal });
-      if (!response.ok) {
-        await handleApiError(response);
-      }
-      return response.json();
-    } catch (error) {
-      handleClientError(
-        error instanceof Error
-          ? error
-          : new Error("Failed to load user reservations"),
-        {
-          path: "/api/reservations/user",
-          method: "GET",
-        },
-      );
-      throw error;
-    }
+  ): Promise<ApiResponse<Reservation[]>> {
+    const response = await fetch("/api/reservations/user", {
+      signal,
+    });
+
+    const data = await response.json();
+    return data;
   },
 
   async validateUsers(
