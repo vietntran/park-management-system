@@ -44,8 +44,11 @@ export const GET = withErrorHandler(async () => {
         include: {
           user: {
             select: {
+              id: true,
               name: true,
               email: true,
+              emailVerified: true,
+              isProfileComplete: true,
             },
           },
         },
@@ -70,8 +73,11 @@ export const GET = withErrorHandler(async () => {
       addedAt: ru.addedAt,
       cancelledAt: ru.cancelledAt,
       user: {
-        name: ru.user.name ?? "",
-        email: ru.user.email ?? "",
+        id: ru.user.id,
+        name: ru.user.name,
+        email: ru.user.email,
+        emailVerified: ru.user.emailVerified ?? null,
+        isProfileComplete: ru.user.isProfileComplete ?? false,
       },
     })),
     dateCapacity: {
