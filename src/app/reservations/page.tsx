@@ -1,3 +1,4 @@
+import { ReservationStatus } from "@prisma/client";
 import { format } from "date-fns";
 import { PlusIcon, Users, ChevronRight } from "lucide-react";
 import { Metadata } from "next";
@@ -8,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import type { Reservation } from "@/types/reservation";
 
 export const metadata: Metadata = {
   title: "Reservations",
@@ -35,7 +37,6 @@ export default async function ReservationsPage() {
     );
   }
 
-  // Get user's reservations
   const reservations = await prisma.reservation.findMany({
     where: {
       OR: [
@@ -48,7 +49,7 @@ export default async function ReservationsPage() {
           },
         },
       ],
-      isCancelled: false,
+      status: ReservationStatus.ACTIVE,
     },
     include: {
       reservationUsers: {
@@ -61,17 +62,35 @@ export default async function ReservationsPage() {
           },
         },
       },
+      dateCapacity: {
+        select: {
+          totalBookings: true,
+          maxCapacity: true,
+        },
+      },
     },
     orderBy: {
       reservationDate: "asc",
     },
   });
 
-  const upcomingReservations = reservations.filter(
+  const transformedReservations: Reservation[] = reservations.map(
+    (reservation) => ({
+      ...reservation,
+      dateCapacity: {
+        totalBookings: reservation.dateCapacity.totalBookings,
+        remainingSpots:
+          reservation.dateCapacity.maxCapacity -
+          reservation.dateCapacity.totalBookings,
+      },
+    }),
+  );
+
+  const upcomingReservations = transformedReservations.filter(
     (reservation) => new Date(reservation.reservationDate) >= new Date(),
   );
 
-  const pastReservations = reservations.filter(
+  const pastReservations = transformedReservations.filter(
     (reservation) => new Date(reservation.reservationDate) < new Date(),
   );
 
