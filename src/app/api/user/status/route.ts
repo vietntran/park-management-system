@@ -1,7 +1,8 @@
+// src/app/api/user/status/route.ts
 import { headers } from "next/headers";
-import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 
+import { createSuccessResponse } from "@/lib/api/responseWrappers";
 import { withErrorHandler } from "@/lib/api/withErrorHandler";
 import { authOptions } from "@/lib/auth";
 import {
@@ -10,22 +11,7 @@ import {
 } from "@/lib/errors/ApplicationErrors";
 import logger from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
-
-interface UserStatus {
-  user: {
-    id: string;
-    email: string;
-    phone: string | null;
-    isProfileComplete: boolean;
-  };
-  isNewUser: boolean;
-  hasUpcomingReservations: boolean;
-  upcomingReservations: Array<{
-    id: string;
-    startDate: Date;
-    guestCount: number;
-  }>;
-}
+import type { UserStatus } from "@/types/user";
 
 export const GET = withErrorHandler<UserStatus>(async () => {
   const requestId = crypto.randomUUID();
@@ -55,7 +41,7 @@ export const GET = withErrorHandler<UserStatus>(async () => {
           reservationDate: {
             gte: new Date(),
           },
-          isCancelled: false,
+          status: "ACTIVE",
         },
         orderBy: {
           reservationDate: "asc",
@@ -102,7 +88,7 @@ export const GET = withErrorHandler<UserStatus>(async () => {
     hasUpcomingReservations: upcomingReservations.length > 0,
   });
 
-  return NextResponse.json({
+  return createSuccessResponse<UserStatus>({
     user: {
       id: user.id,
       email: user.email,

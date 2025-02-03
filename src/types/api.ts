@@ -1,16 +1,14 @@
 // src/types/api.ts
-export interface ApiResponse<T> {
-  success: boolean;
-  data?: T;
-  error?: string;
-}
-
-export interface ApiErrorResponse {
+export interface ErrorResponse {
   success: false;
   error: string;
+  details?: unknown;
+  code?: string;
 }
 
-export interface ApiSuccessResponse<T> {
+export interface SuccessResponse<T> {
   success: true;
   data: T;
 }
+
+export type ApiResponse<T> = SuccessResponse<T> | ErrorResponse;
