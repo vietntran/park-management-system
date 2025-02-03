@@ -181,7 +181,7 @@ export const ReservationForm = () => {
         throw new Error(availability.error);
       }
       if (!availability.data.isAvailable) {
-        throw new Error(availability.data.reason || "Date is not available");
+        throw new Error("Date is not available");
       }
 
       const response = await reservationService.createReservation(data);

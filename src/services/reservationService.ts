@@ -8,6 +8,7 @@ import type {
   ReservationFormData,
   SelectedUser,
   Reservation,
+  Availability,
 } from "@/types/reservation";
 
 // Define the types for the availability response
@@ -83,9 +84,7 @@ export const reservationService = {
     }
   },
 
-  async checkDateAvailability(
-    date: Date,
-  ): Promise<ApiResponse<{ isAvailable: boolean; reason?: string }>> {
+  async checkDateAvailability(date: Date): Promise<ApiResponse<Availability>> {
     try {
       const response = await fetch(
         `/api/reservations/check-availability?date=${date.toISOString()}`,
