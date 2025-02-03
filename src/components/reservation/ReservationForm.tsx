@@ -164,11 +164,14 @@ export const ReservationForm = () => {
         throw new Error("Cannot reserve more than 3 consecutive days");
       }
 
-      const usersAreValid = await validateUsers(data.additionalUsers);
-      if (!usersAreValid) {
-        throw new Error(
-          "One or more selected users are not registered in the system",
-        );
+      // Only validate if there are additional users
+      if (data.additionalUsers.length > 0) {
+        const usersAreValid = await validateUsers(data.additionalUsers);
+        if (!usersAreValid) {
+          throw new Error(
+            "One or more selected users are not registered in the system",
+          );
+        }
       }
 
       const availability = await reservationService.checkDateAvailability(

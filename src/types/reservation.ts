@@ -14,8 +14,11 @@ export interface ReservationUser {
   addedAt: Date;
   cancelledAt: Date | null;
   user?: {
+    id: string;
     name: string;
     email: string;
+    emailVerified: Date | null;
+    isProfileComplete: boolean;
   };
 }
 

@@ -37,7 +37,7 @@ export async function POST(request: Request) {
 
     const { userIds } = validationResult.data;
 
-    // Query all users in one go
+    // Query all users with their accounts
     const users = await prisma.user.findMany({
       where: {
         id: {
@@ -48,10 +48,15 @@ export async function POST(request: Request) {
         id: true,
         isProfileComplete: true,
         emailVerified: true,
+        accounts: {
+          select: {
+            provider: true,
+          },
+        },
       },
     });
 
-    // Check if all users exist and are properly registered
+    // Check if all users exist
     const foundUserIds = new Set(users.map((user) => user.id));
     const missingUserIds = userIds.filter((id) => !foundUserIds.has(id));
 
@@ -61,15 +66,58 @@ export async function POST(request: Request) {
       );
     }
 
-    // Check if all users have completed profiles and verified emails
-    const invalidUsers = users.filter(
-      (user) => !user.isProfileComplete || !user.emailVerified,
+    // Auto-verify Google OAuth users if needed
+    const usersToUpdate = users.filter(
+      (user) =>
+        !user.emailVerified &&
+        user.accounts.some((account) => account.provider === "google"),
     );
 
-    if (invalidUsers.length > 0) {
-      throw new ValidationError(
-        `Some users have incomplete profiles or unverified emails: ${invalidUsers.map((u) => u.id).join(", ")}`,
+    if (usersToUpdate.length > 0) {
+      await prisma.$transaction(
+        usersToUpdate.map((user) =>
+          prisma.user.update({
+            where: { id: user.id },
+            data: { emailVerified: new Date() },
+          }),
+        ),
       );
+
+      // Refresh user data after updates
+      const updatedUsers = await prisma.user.findMany({
+        where: {
+          id: {
+            in: userIds,
+          },
+        },
+        select: {
+          id: true,
+          isProfileComplete: true,
+          emailVerified: true,
+        },
+      });
+
+      // Now check for invalid users with updated data
+      const invalidUsers = updatedUsers.filter(
+        (user) => !user.isProfileComplete || !user.emailVerified,
+      );
+
+      if (invalidUsers.length > 0) {
+        throw new ValidationError(
+          `Some users have incomplete profiles or unverified emails: ${invalidUsers.map((u) => u.id).join(", ")}`,
+        );
+      }
+    } else {
+      // If no Google users to auto-verify, check validity with existing data
+      const invalidUsers = users.filter(
+        (user) => !user.isProfileComplete || !user.emailVerified,
+      );
+
+      if (invalidUsers.length > 0) {
+        throw new ValidationError(
+          `Some users have incomplete profiles or unverified emails: ${invalidUsers.map((u) => u.id).join(", ")}`,
+        );
+      }
     }
 
     // All checks passed
