@@ -1,9 +1,6 @@
 // src/services/reservationService.ts
 import type { ApiResponse } from "@/lib/api/withErrorHandler";
-import {
-  handleApiError,
-  handleClientError,
-} from "@/lib/errors/clientErrorHandler";
+import { typedFetch } from "@/lib/utils";
 import type {
   ReservationFormData,
   SelectedUser,
@@ -23,102 +20,45 @@ export const reservationService = {
     endDate: Date,
     signal?: AbortSignal,
   ): Promise<ApiResponse<AvailabilityRangeData>> {
-    try {
-      const response = await fetch(
-        `/api/reservations/availability?start=${startDate.toISOString()}&end=${endDate.toISOString()}`,
-        { signal },
-      );
-      if (!response.ok) {
-        await handleApiError(response);
-      }
-      return response.json();
-    } catch (error) {
-      handleClientError(
-        error instanceof Error
-          ? error
-          : new Error("Failed to load available dates"),
-        {
-          path: "/api/reservations/availability",
-          method: "GET",
-        },
-      );
-      throw error;
-    }
+    return typedFetch<AvailabilityRangeData>(
+      `/api/reservations/availability?start=${startDate.toISOString()}&end=${endDate.toISOString()}`,
+      { signal },
+    );
   },
 
   async getUserReservations(
     signal?: AbortSignal,
   ): Promise<ApiResponse<Reservation[]>> {
-    const response = await fetch("/api/reservations/user", {
-      signal,
-    });
-
-    const data = await response.json();
-    return data;
+    return typedFetch<Reservation[]>("/api/reservations/user", { signal });
   },
 
   async validateUsers(
     users: SelectedUser[],
   ): Promise<ApiResponse<{ valid: boolean }>> {
-    try {
-      const response = await fetch("/api/users/validate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ userIds: users.map((u) => u.id) }),
-      });
-      if (!response.ok) {
-        await handleApiError(response);
-      }
-      return response.json();
-    } catch (error) {
-      handleClientError(
-        error instanceof Error ? error : new Error("Failed to validate users"),
-        {
-          path: "/api/users/validate",
-          method: "POST",
-        },
-      );
-      throw error;
-    }
+    return typedFetch<{ valid: boolean }>("/api/users/validate", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ userIds: users.map((u) => u.id) }),
+    });
   },
 
   async checkDateAvailability(date: Date): Promise<ApiResponse<Availability>> {
-    try {
-      const response = await fetch(
-        `/api/reservations/check-availability?date=${date.toISOString()}`,
-      );
-      if (!response.ok) {
-        await handleApiError(response);
-      }
-      return response.json();
-    } catch (error) {
-      handleClientError(
-        error instanceof Error
-          ? error
-          : new Error("Failed to check date availability"),
-        {
-          path: "/api/reservations/check-availability",
-          method: "GET",
-        },
-      );
-      throw error;
-    }
+    return typedFetch<Availability>(
+      `/api/reservations/check-availability?date=${date.toISOString()}`,
+    );
   },
 
   async createReservation(
     data: ReservationFormData,
   ): Promise<ApiResponse<Reservation>> {
-    const response = await fetch("/api/reservations/create", {
+    return typedFetch<Reservation>("/api/reservations/create", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify(data),
     });
-
-    const result = await response.json();
-    return result;
   },
 };
