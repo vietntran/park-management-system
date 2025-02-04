@@ -1,8 +1,9 @@
+// src/app/api/auth/verify-email/route.ts
 import { headers } from "next/headers";
-import { NextResponse, NextRequest } from "next/server";
+import { NextRequest } from "next/server";
 import { getServerSession } from "next-auth";
 
-import { HTTP_STATUS } from "@/constants/http";
+import { createSuccessResponse } from "@/lib/api/responseWrappers";
 import { withErrorHandler } from "@/lib/api/withErrorHandler";
 import {
   AuthenticationError,
@@ -15,6 +16,7 @@ import { emailVerificationSchema } from "@/lib/validations/auth";
 
 interface EmailVerificationResponse {
   message: string;
+  redirectUrl: string;
 }
 
 export const POST = withErrorHandler<EmailVerificationResponse>(
@@ -75,17 +77,18 @@ export const POST = withErrorHandler<EmailVerificationResponse>(
         throw new TokenExpiredError("Verification token has expired");
       }
 
-      // Update user email verification status
+      // Update user email verification status and ensure profile needs completion
       const updatedUser = await tx.user.update({
         where: {
           email: verificationToken.identifier,
         },
         data: {
           emailVerified: new Date(),
+          isProfileComplete: false, // Explicitly set to ensure profile completion is required
         },
       });
 
-      // Delete used token
+      // Delete used token - Important for security
       await tx.verificationToken.delete({
         where: { token },
       });
@@ -98,11 +101,13 @@ export const POST = withErrorHandler<EmailVerificationResponse>(
       ip,
       userId: verifiedUser.id,
       email: verifiedUser.email,
+      redirectTo: "/profile/complete",
     });
 
-    return NextResponse.json(
-      { message: "Email verified successfully" },
-      { status: HTTP_STATUS.OK },
-    );
+    // Return success with redirect URL
+    return createSuccessResponse({
+      message: "Email verified successfully",
+      redirectUrl: "/profile/complete",
+    });
   },
 );

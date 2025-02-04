@@ -14,3 +14,13 @@ export interface AuthSuccess {
 }
 
 export type AuthResponse = ApiResponse<AuthSuccess>;
+
+export interface AuthLoadingStates {
+  isVerifying: boolean;
+  isResendingVerification: boolean;
+}
+
+export interface AuthErrorStates {
+  verificationError: string | null;
+  resendError: string | null;
+}
