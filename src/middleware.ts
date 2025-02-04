@@ -2,45 +2,73 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
 
+import logger from "@/lib/logger";
+import type { LogContext } from "@/lib/logger";
+
 export async function middleware(request: NextRequest) {
-  const token = await getToken({ req: request });
+  try {
+    const token = await getToken({ req: request });
+    const logContext: LogContext = {
+      path: request.nextUrl.pathname,
+      method: request.method,
+    };
 
-  // Check if user is authenticated
-  if (!token) {
-    return NextResponse.redirect(
-      new URL(`/auth/login?from=${request.nextUrl.pathname}`, request.url),
-    );
-  }
-
-  // Check profile completion for all protected routes
-  if (!token.isProfileComplete) {
-    // Don't redirect if already on profile completion page
-    if (request.nextUrl.pathname === "/profile/complete") {
-      return NextResponse.next();
+    if (!token) {
+      logger.info("Unauthenticated access attempt", {
+        ...logContext,
+        redirectTo: "/auth/login",
+      });
+      return NextResponse.redirect(
+        new URL(`/auth/login?from=${request.nextUrl.pathname}`, request.url),
+      );
     }
 
-    const response = NextResponse.redirect(
-      new URL("/profile/complete", request.url),
-    );
+    // Add userId to context once we have the token
+    logContext.userId = token.sub;
 
-    // Store the original URL to redirect back after profile completion
-    response.cookies.set(
-      "redirectAfterProfile",
-      request.nextUrl.pathname + request.nextUrl.search,
-    );
+    if (!token.isProfileComplete) {
+      if (request.nextUrl.pathname === "/profile/complete") {
+        return NextResponse.next();
+      }
 
-    return response;
+      logger.info("Incomplete profile access attempt", {
+        ...logContext,
+        redirectTo: "/profile/complete",
+      });
+
+      const response = NextResponse.redirect(
+        new URL("/profile/complete", request.url),
+      );
+
+      response.cookies.set(
+        "redirectAfterProfile",
+        request.nextUrl.pathname + request.nextUrl.search,
+      );
+
+      return response;
+    }
+
+    return NextResponse.next();
+  } catch (error) {
+    const errorContext: LogContext = {
+      path: request.nextUrl.pathname,
+      method: request.method,
+      error: error instanceof Error ? error : new Error(String(error)),
+    };
+
+    logger.error("Middleware error", errorContext);
+
+    // Still redirect to login on error for security
+    return NextResponse.redirect(new URL("/auth/login", request.url));
   }
-
-  return NextResponse.next();
 }
 
-// Configure which routes should be handled by this middleware
+// Config remains the same
 export const config = {
   matcher: [
     "/dashboard/:path*",
     "/api/reservations/:path*",
     "/reservations/:path*",
-    "/profile/complete", // Include this to prevent redirect loops
+    "/profile/complete", // Prevent redirect loops
   ],
 };
