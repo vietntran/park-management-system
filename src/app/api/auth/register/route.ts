@@ -1,8 +1,9 @@
 import { hash } from "bcryptjs";
 import { headers } from "next/headers";
-import { NextResponse, NextRequest } from "next/server";
+import { NextRequest } from "next/server";
 
 import { HTTP_STATUS } from "@/constants/http";
+import { createSuccessResponse } from "@/lib/api/responseWrappers";
 import { withErrorHandler } from "@/lib/api/withErrorHandler";
 import {
   ValidationError,
@@ -20,7 +21,7 @@ interface RateLimitInfo {
 }
 
 // Response type for registration
-interface RegistrationResponse {
+export interface RegistrationResponse {
   user: {
     id: string;
     email: string;
@@ -143,7 +144,7 @@ export const POST = withErrorHandler<RegistrationResponse>(
       email: user.email,
     });
 
-    return NextResponse.json(
+    return createSuccessResponse(
       {
         user: {
           id: user.id,
@@ -151,7 +152,7 @@ export const POST = withErrorHandler<RegistrationResponse>(
           name: user.name,
         },
       },
-      { status: HTTP_STATUS.CREATED },
+      HTTP_STATUS.CREATED,
     );
   },
 );

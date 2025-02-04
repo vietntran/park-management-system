@@ -2,7 +2,9 @@ import { Eye, EyeOff } from "lucide-react";
 import { useRouter } from "next/navigation";
 import React, { useState } from "react";
 
+import { RegistrationResponse } from "@/app/api/auth/register/route";
 import AddressForm from "@/components/forms/AddressForm";
+import { typedFetch } from "@/lib/utils";
 import { registerSchema } from "@/lib/validations/auth";
 import type { Address, PartialAddress } from "@/types/address";
 import { type RegisterFormData } from "@/types/auth";
@@ -61,18 +63,21 @@ export default function RegisterForm() {
     }
 
     try {
-      const response = await fetch("/api/auth/register", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+      const responseData = await typedFetch<RegistrationResponse>(
+        "/api/auth/register",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(result.data),
         },
-        body: JSON.stringify(result.data),
-      });
+      );
 
-      const responseData = await response.json();
-
-      if (!response.ok) {
-        throw new Error(responseData.error || "Registration failed");
+      if (!responseData.success) {
+        throw new Error(
+          responseData.error || "Failed to create account. Please try again.",
+        );
       }
 
       router.push("/login");
