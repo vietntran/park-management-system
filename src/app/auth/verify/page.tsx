@@ -58,8 +58,11 @@ export default function VerifyEmailPage() {
       }
     };
 
-    verifyEmail();
-  }, [token, router, setLoading, setError, clearErrors]);
+    // Only verify if we have a token and verification hasn't started
+    if (token && !isVerifying) {
+      verifyEmail();
+    }
+  }, [token, router, setLoading, setError, clearErrors, isVerifying]);
 
   if (verificationError) {
     return (
