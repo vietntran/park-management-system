@@ -1,5 +1,5 @@
 // src/components/auth/EmailVerificationPrompt.tsx
-import { ResendVerificationButton } from "@/components/auth/SendEmailVerificationButton";
+import { SendEmailVerificationButton } from "@/components/auth/SendEmailVerificationButton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/Alert";
 
 interface EmailVerificationPromptProps {
@@ -24,7 +24,7 @@ export function EmailVerificationPrompt({
             Haven&apos;t received the email? Check your spam folder or click
             below to resend.
           </p>
-          <ResendVerificationButton />
+          <SendEmailVerificationButton />
         </div>
       </AlertDescription>
     </Alert>
