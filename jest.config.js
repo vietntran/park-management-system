@@ -4,41 +4,26 @@ const createJestConfig = nextJest({
   dir: "./",
 });
 
-/** @type {import('jest').Config} */
 const customJestConfig = {
-  setupFilesAfterEnv: [
-    "<rootDir>/jest.setup.js",
-    "<rootDir>/src/__tests__/setup.ts",
-  ],
-  // Change this for API routes
-  testEnvironment: "jest-environment-node",
+  setupFilesAfterEnv: ["<rootDir>/jest.setup.js"],
   moduleNameMapper: {
     "^@/(.*)$": "<rootDir>/src/$1",
   },
-  transform: {
-    "^.+\\.(ts|tsx)$": ["ts-jest"],
+  testEnvironmentOptions: {
+    url: "http://localhost",
   },
-  moduleFileExtensions: ["ts", "tsx", "js", "jsx", "json", "node"],
-  testPathIgnorePatterns: ["<rootDir>/.next/", "<rootDir>/node_modules/"],
+  testEnvironment: "jsdom",
   collectCoverageFrom: [
-    "src/**/*.{ts,tsx}",
+    "src/**/*.{js,jsx,ts,tsx}",
     "!src/**/*.d.ts",
-    "!src/**/*.stories.{ts,tsx}",
-    "!src/**/*.test.{ts,tsx}",
+    "!src/**/_*.{js,jsx,ts,tsx}",
+    "!src/**/index.ts",
   ],
-  globals: {
-    "ts-jest": {
-      tsconfig: "tsconfig.jest.json",
-    },
-  },
-  moduleDirectories: ["node_modules", "<rootDir>/"],
-  testMatch: [
-    "**/__tests__/**/*.(spec|test).[jt]s?(x)",
-    "**/?(*.)+(spec|test).[jt]s?(x)",
-  ],
-  // Add @auth/prisma-adapter to the list
-  transformIgnorePatterns: [
-    "/node_modules/(?!(@auth/core|@auth/prisma-adapter|@hookform/resolvers)/)",
+  // Add testPathIgnorePatterns to ignore setup.ts
+  testPathIgnorePatterns: [
+    "<rootDir>/node_modules/",
+    "<rootDir>/.next/",
+    "<rootDir>/src/__tests__/setup.ts",
   ],
 };
 
