@@ -10,7 +10,8 @@ const customJestConfig = {
     "<rootDir>/jest.setup.js",
     "<rootDir>/src/__tests__/setup.ts",
   ],
-  testEnvironment: "jest-environment-jsdom",
+  // Change this for API routes
+  testEnvironment: "jest-environment-node",
   moduleNameMapper: {
     "^@/(.*)$": "<rootDir>/src/$1",
   },
@@ -35,8 +36,9 @@ const customJestConfig = {
     "**/__tests__/**/*.(spec|test).[jt]s?(x)",
     "**/?(*.)+(spec|test).[jt]s?(x)",
   ],
+  // Add @auth/prisma-adapter to the list
   transformIgnorePatterns: [
-    "/node_modules/(?!(@auth/core|@hookform/resolvers)/)",
+    "/node_modules/(?!(@auth/core|@auth/prisma-adapter|@hookform/resolvers)/)",
   ],
 };
 
