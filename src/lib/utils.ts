@@ -30,3 +30,7 @@ export async function typedFetch<T>(
     throw error;
   }
 }
+
+export function generateToken(): string {
+  return crypto.randomUUID();
+}

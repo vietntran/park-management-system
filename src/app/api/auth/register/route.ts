@@ -12,7 +12,9 @@ import {
 } from "@/lib/errors/ApplicationErrors";
 import logger from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
+import { generateToken } from "@/lib/utils";
 import { registerSchema } from "@/lib/validations/auth";
+import { emailService } from "@/services/emailService";
 
 // Rate limiting types
 interface RateLimitInfo {
@@ -116,27 +118,51 @@ export const POST = withErrorHandler<RegistrationResponse>(
     // Hash password
     const hashedPassword = await hash(password, 12);
 
-    // Create user
-    const user = await prisma.user.create({
-      data: {
-        email,
-        name,
-        phone,
-        password: hashedPassword,
-        address: address
-          ? {
-              create: {
-                line1: address.line1,
-                line2: address.line2,
-                city: address.city,
-                state: address.state,
-                zipCode: address.zipCode,
-              },
-            }
-          : undefined,
-        phoneVerified: false,
+    // Start a transaction for user creation and token generation
+    const { user, verificationToken } = await prisma.$transaction(
+      async (tx) => {
+        // Create user
+        const user = await tx.user.create({
+          data: {
+            email,
+            name,
+            phone,
+            password: hashedPassword,
+            address: address
+              ? {
+                  create: {
+                    line1: address.line1,
+                    line2: address.line2,
+                    city: address.city,
+                    state: address.state,
+                    zipCode: address.zipCode,
+                  },
+                }
+              : undefined,
+            phoneVerified: false,
+            isProfileComplete: false,
+          },
+        });
+
+        // Generate and save verification token
+        const token = generateToken();
+        const expires = new Date();
+        expires.setHours(expires.getHours() + 24); // Token expires in 24 hours
+
+        const verificationToken = await tx.verificationToken.create({
+          data: {
+            token,
+            expires,
+            identifier: email,
+          },
+        });
+
+        return { user, verificationToken };
       },
-    });
+    );
+
+    // Send verification email
+    await emailService.sendVerificationEmail(email, verificationToken.token);
 
     logger.info("User registered successfully", {
       requestId,

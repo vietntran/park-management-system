@@ -1,10 +1,10 @@
-// src/app/auth/verify/page.tsx
 "use client";
 
 import { Loader2 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect } from "react";
 
+import { EmailVerificationPrompt } from "@/components/auth/EmailVerificationPrompt";
 import { Alert } from "@/components/ui/Alert";
 import { useAuthLoadingStates } from "@/hooks/useAuthLoadingStates";
 import logger from "@/lib/logger";
@@ -45,7 +45,6 @@ export default function VerifyEmailPage() {
           throw new Error(data.error || "Verification failed");
         }
 
-        // Redirect to the specified URL (likely profile completion)
         router.push(data.redirectUrl);
       } catch (error) {
         logger.error("Email verification failed", {
@@ -72,6 +71,13 @@ export default function VerifyEmailPage() {
             </h2>
           </div>
           <Alert variant="error">{verificationError}</Alert>
+          {/* Add resend option for expired or invalid tokens */}
+          {(verificationError.includes("expired") ||
+            verificationError.includes("invalid")) && (
+            <div className="mt-6">
+              <EmailVerificationPrompt />
+            </div>
+          )}
         </div>
       </div>
     );
