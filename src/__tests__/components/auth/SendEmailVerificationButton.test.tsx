@@ -1,11 +1,10 @@
-// src/__tests__/components/auth/ResendVerificationButton.test.tsx
+// src/__tests__/components/auth/SendEmailVerificationButton.test.tsx
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { act } from "react";
 import { toast } from "sonner";
 
-import { ResendVerificationButton } from "@/components/auth/ResendVerificationButton";
+import { SendEmailVerificationButton } from "@/components/auth/SendEmailVerificationButton";
 
-// Mock sonner toast
 jest.mock("sonner", () => ({
   toast: {
     success: jest.fn(),
@@ -13,15 +12,15 @@ jest.mock("sonner", () => ({
   },
 }));
 
-describe("ResendVerificationButton", () => {
+describe("SendEmailVerificationButton", () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
   it("should render correctly", () => {
-    render(<ResendVerificationButton />);
+    render(<SendEmailVerificationButton />);
     expect(screen.getByRole("button")).toHaveTextContent(
-      "Resend verification email",
+      "Send verification email",
     );
   });
 
@@ -32,7 +31,7 @@ describe("ResendVerificationButton", () => {
         () => new Promise((resolve) => setTimeout(resolve, 100)),
       );
 
-    render(<ResendVerificationButton />);
+    render(<SendEmailVerificationButton />);
 
     const button = screen.getByRole("button");
     await act(async () => {
@@ -43,16 +42,15 @@ describe("ResendVerificationButton", () => {
     expect(button).toBeDisabled();
   });
 
-  it("should handle successful resend", async () => {
+  it("should handle successful send", async () => {
     global.fetch = jest.fn().mockImplementationOnce(() =>
       Promise.resolve({
         ok: true,
-        json: () =>
-          Promise.resolve({ message: "Verification email sent successfully" }),
+        json: () => Promise.resolve({ message: "Verification email sent" }),
       }),
     );
 
-    render(<ResendVerificationButton />);
+    render(<SendEmailVerificationButton />);
 
     const button = screen.getByRole("button");
     await act(async () => {
@@ -62,16 +60,14 @@ describe("ResendVerificationButton", () => {
     await waitFor(() => {
       expect(screen.getByRole("button")).not.toBeDisabled();
       expect(screen.getByRole("button")).toHaveTextContent(
-        "Resend verification email",
+        "Send verification email",
       );
     });
 
-    expect(toast.success).toHaveBeenCalledWith(
-      "Verification email sent successfully",
-    );
+    expect(toast.success).toHaveBeenCalledWith("Verification email sent");
   });
 
-  it("should handle resend error", async () => {
+  it("should handle send error", async () => {
     const errorMessage = "Too many attempts";
     global.fetch = jest.fn().mockImplementationOnce(() =>
       Promise.resolve({
@@ -80,7 +76,7 @@ describe("ResendVerificationButton", () => {
       }),
     );
 
-    render(<ResendVerificationButton />);
+    render(<SendEmailVerificationButton />);
 
     const button = screen.getByRole("button");
     await act(async () => {

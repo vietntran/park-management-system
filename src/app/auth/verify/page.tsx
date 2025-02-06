@@ -14,8 +14,8 @@ export default function VerifyEmailPage() {
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
   const {
-    loadingStates: { isVerifying },
-    errors: { verificationError },
+    loadingStates: { isVerifyingEmailToken },
+    errors: { verifyingEmailTokenError },
     setLoading,
     setError,
     clearErrors,
@@ -24,12 +24,12 @@ export default function VerifyEmailPage() {
   useEffect(() => {
     const verifyEmail = async () => {
       if (!token) {
-        setError("verificationError", "No verification token found");
-        setLoading("isVerifying", false);
+        setError("verifyingEmailTokenError", "No verification token found");
+        setLoading("isVerifyingEmailToken", false);
         return;
       }
 
-      setLoading("isVerifying", true);
+      setLoading("isVerifyingEmailToken", true);
       clearErrors();
 
       try {
@@ -51,20 +51,20 @@ export default function VerifyEmailPage() {
           error: error instanceof Error ? error : new Error(String(error)),
         });
         setError(
-          "verificationError",
+          "verifyingEmailTokenError",
           error instanceof Error ? error.message : "Verification failed",
         );
-        setLoading("isVerifying", false);
+        setLoading("isVerifyingEmailToken", false);
       }
     };
 
     // Only verify if we have a token and verification hasn't started
-    if (token && !isVerifying) {
+    if (token && !isVerifyingEmailToken) {
       verifyEmail();
     }
-  }, [token, router, setLoading, setError, clearErrors, isVerifying]);
+  }, [token, router, setLoading, setError, clearErrors, isVerifyingEmailToken]);
 
-  if (verificationError) {
+  if (verifyingEmailTokenError) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50 px-4 py-12 sm:px-6 lg:px-8">
         <div className="w-full max-w-md space-y-8">
@@ -73,10 +73,10 @@ export default function VerifyEmailPage() {
               Email Verification Failed
             </h2>
           </div>
-          <Alert variant="error">{verificationError}</Alert>
+          <Alert variant="error">{verifyingEmailTokenError}</Alert>
           {/* Add resend option for expired or invalid tokens */}
-          {(verificationError.includes("expired") ||
-            verificationError.includes("invalid")) && (
+          {(verifyingEmailTokenError.includes("expired") ||
+            verifyingEmailTokenError.includes("invalid")) && (
             <div className="mt-6">
               <EmailVerificationPrompt />
             </div>
@@ -91,9 +91,9 @@ export default function VerifyEmailPage() {
       <div className="w-full max-w-md space-y-8">
         <div className="text-center">
           <h2 className="mt-6 text-3xl font-bold tracking-tight text-gray-900">
-            {isVerifying ? "Verifying Your Email" : "Email Verified"}
+            {isVerifyingEmailToken ? "Verifying Your Email" : "Email Verified"}
           </h2>
-          {isVerifying && (
+          {isVerifyingEmailToken && (
             <div className="mt-4 flex flex-col items-center gap-2">
               <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
               <p className="text-sm text-gray-600">

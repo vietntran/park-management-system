@@ -1,5 +1,5 @@
 // src/components/auth/EmailVerificationPrompt.tsx
-import { ResendVerificationButton } from "@/components/auth/ResendVerificationButton";
+import { ResendVerificationButton } from "@/components/auth/SendEmailVerificationButton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/Alert";
 
 interface EmailVerificationPromptProps {

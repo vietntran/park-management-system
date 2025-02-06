@@ -51,8 +51,8 @@ describe("VerifyEmailPage", () => {
 
     // Setup useAuthLoadingStates mock with default values
     (useAuthLoadingStates as jest.Mock).mockImplementation(() => ({
-      loadingStates: { isVerifying: true },
-      errors: { verificationError: null },
+      loadingStates: { isVerifyingEmailToken: true },
+      errors: { verifyingEmailTokenError: null },
       setLoading: mockSetLoading,
       setError: mockSetError,
       clearErrors: mockClearErrors,
@@ -87,8 +87,8 @@ describe("VerifyEmailPage", () => {
 
     // Override useAuthLoadingStates to show error state
     (useAuthLoadingStates as jest.Mock).mockImplementation(() => ({
-      loadingStates: { isVerifying: false },
-      errors: { verificationError: "No verification token found" },
+      loadingStates: { isVerifyingEmailToken: false },
+      errors: { verifyingEmailTokenError: "No verification token found" },
       setLoading: mockSetLoading,
       setError: mockSetError,
       clearErrors: mockClearErrors,
@@ -117,8 +117,8 @@ describe("VerifyEmailPage", () => {
 
     // Override useAuthLoadingStates to show error state
     (useAuthLoadingStates as jest.Mock).mockImplementation(() => ({
-      loadingStates: { isVerifying: false },
-      errors: { verificationError: "Token expired" },
+      loadingStates: { isVerifyingEmailToken: false },
+      errors: { verifyingEmailTokenError: "Token expired" },
       setLoading: mockSetLoading,
       setError: mockSetError,
       clearErrors: mockClearErrors,
@@ -146,10 +146,10 @@ describe("VerifyEmailPage", () => {
       json: () => Promise.resolve({ redirectUrl: mockRedirectUrl }),
     });
 
-    // Return isVerifying: false to allow verification to start
+    // Return isVerifyingEmailToken: false to allow verification to start
     (useAuthLoadingStates as jest.Mock).mockReturnValue({
-      loadingStates: { isVerifying: false },
-      errors: { verificationError: null },
+      loadingStates: { isVerifyingEmailToken: false },
+      errors: { verifyingEmailTokenError: null },
       setLoading: mockSetLoading,
       setError: mockSetError,
       clearErrors: mockClearErrors,

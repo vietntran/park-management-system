@@ -5,13 +5,13 @@ import type { AuthLoadingStates, AuthErrorStates } from "@/types/auth";
 
 export const useAuthLoadingStates = () => {
   const [loadingStates, setLoadingStates] = useState<AuthLoadingStates>({
-    isVerifying: false,
-    isResendingVerification: false,
+    isVerifyingEmailToken: false,
+    isSendingVerificationEmail: false,
   });
 
   const [errors, setErrors] = useState<AuthErrorStates>({
-    verificationError: null,
-    resendError: null,
+    verifyingEmailTokenError: null,
+    sendingVerificationEmailError: null,
   });
 
   const setLoading = (key: keyof AuthLoadingStates, value: boolean) => {
@@ -24,8 +24,8 @@ export const useAuthLoadingStates = () => {
 
   const clearErrors = () => {
     setErrors({
-      verificationError: null,
-      resendError: null,
+      verifyingEmailTokenError: null,
+      sendingVerificationEmailError: null,
     });
   };
 

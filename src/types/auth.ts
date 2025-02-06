@@ -16,11 +16,11 @@ export interface AuthSuccess {
 export type AuthResponse = ApiResponse<AuthSuccess>;
 
 export interface AuthLoadingStates {
-  isVerifying: boolean;
-  isResendingVerification: boolean;
+  isVerifyingEmailToken: boolean;
+  isSendingVerificationEmail: boolean;
 }
 
 export interface AuthErrorStates {
-  verificationError: string | null;
-  resendError: string | null;
+  verifyingEmailTokenError: string | null;
+  sendingVerificationEmailError: string | null;
 }
