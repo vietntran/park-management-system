@@ -6,6 +6,7 @@ import { loginSchema, registerSchema } from "@/lib/validations/auth";
 import type { ApiResponse } from "./api";
 
 export type LoginFormData = z.infer<typeof loginSchema>;
+export type LoginError = string | null;
 export type RegisterFormData = z.infer<typeof registerSchema>;
 
 export interface AuthSuccess {

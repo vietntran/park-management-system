@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
 
-import logger from "@/lib/logger";
+import edgeLogger from "@/lib/edge-logger";
 import type { LogContext } from "@/lib/logger";
 
 export async function middleware(request: NextRequest) {
@@ -14,7 +14,7 @@ export async function middleware(request: NextRequest) {
     };
 
     if (!token) {
-      logger.info("Unauthenticated access attempt", {
+      edgeLogger.info("Unauthenticated access attempt", {
         ...logContext,
         redirectTo: "/auth/login",
       });
@@ -31,7 +31,7 @@ export async function middleware(request: NextRequest) {
         return NextResponse.next();
       }
 
-      logger.info("Incomplete profile access attempt", {
+      edgeLogger.info("Incomplete profile access attempt", {
         ...logContext,
         redirectTo: "/profile/complete",
       });
@@ -56,7 +56,7 @@ export async function middleware(request: NextRequest) {
       error: error instanceof Error ? error : new Error(String(error)),
     };
 
-    logger.error("Middleware error", errorContext);
+    edgeLogger.error("Middleware error", errorContext);
 
     // Still redirect to login on error for security
     return NextResponse.redirect(new URL("/auth/login", request.url));
