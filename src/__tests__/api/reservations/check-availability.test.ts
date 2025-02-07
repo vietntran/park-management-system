@@ -140,6 +140,98 @@ describe("Check Availability API Route", () => {
     const body = await response.json();
     expect(body.error).toBe("No available spots for this date");
   });
+
+  it("should return partial capacity status when some spots are taken", async () => {
+    // Mock date capacity with some spots taken
+    const takenSpots = 20;
+    // @ts-expect-error - Ignore circular reference initialization
+    const { prisma } = jest.requireMock("@/lib/prisma") as {
+      // @ts-expect-error - Ignore prisma self-referential type
+      prisma: jest.Mocked<typeof prisma>;
+    };
+    prisma.dateCapacity.findUnique.mockResolvedValue({
+      date: new Date(validFutureDate),
+      maxCapacity: RESERVATION_LIMITS.MAX_DAILY_RESERVATIONS,
+      totalBookings: takenSpots,
+    });
+
+    const url = new URL(
+      "http://localhost:3000/api/reservations/check-availability",
+    );
+    url.searchParams.set("date", validFutureDate);
+
+    const request = new Request(url, {
+      method: "GET",
+    }) as unknown as NextRequest;
+
+    const response = await GET(request);
+    expect(response.status).toBe(200);
+
+    const body = await response.json();
+    expect(body.data.isAvailable).toBe(true);
+    expect(body.data.remainingSpots).toBe(
+      RESERVATION_LIMITS.MAX_DAILY_RESERVATIONS - takenSpots,
+    );
+  });
+
+  it("should return almost full status when only one spot remains", async () => {
+    // Mock date capacity with only one spot remaining
+    // @ts-expect-error - Ignore circular reference initialization
+    const { prisma } = jest.requireMock("@/lib/prisma") as {
+      // @ts-expect-error - Ignore prisma self-referential type
+      prisma: jest.Mocked<typeof prisma>;
+    };
+    prisma.dateCapacity.findUnique.mockResolvedValue({
+      date: new Date(validFutureDate),
+      maxCapacity: RESERVATION_LIMITS.MAX_DAILY_RESERVATIONS,
+      totalBookings: RESERVATION_LIMITS.MAX_DAILY_RESERVATIONS - 1,
+    });
+
+    const url = new URL(
+      "http://localhost:3000/api/reservations/check-availability",
+    );
+    url.searchParams.set("date", validFutureDate);
+
+    const request = new Request(url, {
+      method: "GET",
+    }) as unknown as NextRequest;
+
+    const response = await GET(request);
+    expect(response.status).toBe(200);
+
+    const body = await response.json();
+    expect(body.data.isAvailable).toBe(true);
+    expect(body.data.remainingSpots).toBe(1);
+  });
+
+  it("should return full capacity status accurately", async () => {
+    // Mock date capacity at exact limit
+    // @ts-expect-error - Ignore circular reference initialization
+    const { prisma } = jest.requireMock("@/lib/prisma") as {
+      // @ts-expect-error - Ignore prisma self-referential type
+      prisma: jest.Mocked<typeof prisma>;
+    };
+    prisma.dateCapacity.findUnique.mockResolvedValue({
+      date: new Date(validFutureDate),
+      maxCapacity: RESERVATION_LIMITS.MAX_DAILY_RESERVATIONS,
+      totalBookings: RESERVATION_LIMITS.MAX_DAILY_RESERVATIONS,
+    });
+
+    const url = new URL(
+      "http://localhost:3000/api/reservations/check-availability",
+    );
+    url.searchParams.set("date", validFutureDate);
+
+    const request = new Request(url, {
+      method: "GET",
+    }) as unknown as NextRequest;
+
+    const response = await GET(request);
+    expect(response.status).toBe(409);
+
+    const body = await response.json();
+    expect(body.error).toBe("No available spots for this date");
+  });
 });
 
 describe("Consecutive Dates Validation", () => {
