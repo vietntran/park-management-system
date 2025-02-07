@@ -1,4 +1,4 @@
-import { addDays, startOfDay } from "date-fns";
+import { addDays, differenceInMonths, startOfDay } from "date-fns";
 import { headers } from "next/headers";
 import { type NextRequest } from "next/server";
 import { z } from "zod";
@@ -11,22 +11,39 @@ import { ValidationError } from "@/lib/errors/ApplicationErrors";
 import logger from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
 
-// Define a type for the response that extends AvailabilityResponse
 interface AvailabilityRangeData {
   availableDates: string[];
   maxCapacity: number;
 }
 
+// Constants
+const MAX_MONTHS_RANGE = 3;
+const MAX_DAILY_RESERVATIONS = RESERVATION_LIMITS.MAX_DAILY_RESERVATIONS;
+
 // Zod schema for request validation
 const dateRangeSchema = z.object({
-  start: z.string().refine((date) => {
-    const parsedDate = new Date(date);
-    return !isNaN(parsedDate.getTime());
-  }, "Invalid start date format"),
-  end: z.string().refine((date) => {
-    const parsedDate = new Date(date);
-    return !isNaN(parsedDate.getTime());
-  }, "Invalid end date format"),
+  start: z.string().transform((val, ctx) => {
+    const date = new Date(val);
+    if (isNaN(date.getTime())) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.invalid_date,
+        message: "Invalid start date format",
+      });
+      return z.NEVER;
+    }
+    return date;
+  }),
+  end: z.string().transform((val, ctx) => {
+    const date = new Date(val);
+    if (isNaN(date.getTime())) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.invalid_date,
+        message: "Invalid end date format",
+      });
+      return z.NEVER;
+    }
+    return date;
+  }),
 });
 
 export const GET = withErrorHandler<AvailabilityRangeData>(
@@ -50,34 +67,62 @@ export const GET = withErrorHandler<AvailabilityRangeData>(
       throw new ValidationError("Both start and end dates are required");
     }
 
-    // Validate request parameters
-    const result = dateRangeSchema.safeParse({ start, end });
-    if (!result.success) {
-      logger.warn("Invalid date parameters for availability check", {
-        requestId,
-        ip,
-        start,
-        end,
-        errors: result.error.errors,
-      });
-      throw new ValidationError(result.error.message);
+    // Validate request parameters with Zod
+    let validatedStart: Date;
+    let validatedEnd: Date;
+
+    try {
+      const result = dateRangeSchema.parse({ start, end });
+      validatedStart = result.start;
+      validatedEnd = result.end;
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        logger.warn("Invalid date parameters for availability check", {
+          requestId,
+          ip,
+          start,
+          end,
+          errors: error.errors,
+        });
+        const errorMessage = error.errors
+          .map((err) => `${err.path.join(".")}: ${err.message}`)
+          .join(", ");
+        throw new ValidationError(errorMessage);
+      }
+      throw error;
     }
 
-    const { start: validatedStart, end: validatedEnd } = result.data;
-    const startDate = startOfDay(new Date(validatedStart));
-    const endDate = startOfDay(new Date(validatedEnd));
+    const startDate = startOfDay(validatedStart);
+    const endDate = startOfDay(validatedEnd);
+    const today = startOfDay(new Date());
 
-    // Additional date range validation
+    // Validate date range and future dates in one check
+    const validationErrors: string[] = [];
+
+    if (startDate < today) {
+      validationErrors.push("Start date must not be in the past");
+    }
+
     if (startDate > endDate) {
-      logger.warn("Invalid date range for availability check", {
+      validationErrors.push("Start date must be before or equal to end date");
+    }
+
+    if (differenceInMonths(endDate, startDate) > MAX_MONTHS_RANGE) {
+      validationErrors.push(
+        `Date range cannot exceed ${MAX_MONTHS_RANGE} months`,
+      );
+    }
+
+    if (validationErrors.length > 0) {
+      logger.warn("Date validation failed", {
         requestId,
         ip,
         startDate,
         endDate,
+        today,
+        errors: validationErrors,
       });
-      throw new ValidationError(
-        "Start date must be before or equal to end date",
-      );
+      throw new ValidationError(validationErrors.join(". "));
     }
 
     // Get existing reservations for the date range
@@ -110,7 +155,7 @@ export const GET = withErrorHandler<AvailabilityRangeData>(
     const availableDates = allDates
       .filter((date) => {
         const bookings = bookingsMap.get(date.toISOString()) ?? 0;
-        return bookings < RESERVATION_LIMITS.MAX_DAILY_RESERVATIONS;
+        return bookings < MAX_DAILY_RESERVATIONS;
       })
       .map((date) => date.toISOString());
 
@@ -128,7 +173,7 @@ export const GET = withErrorHandler<AvailabilityRangeData>(
     return createSuccessResponse(
       {
         availableDates,
-        maxCapacity: RESERVATION_LIMITS.MAX_DAILY_RESERVATIONS,
+        maxCapacity: MAX_DAILY_RESERVATIONS,
       },
       HTTP_STATUS.OK,
     );
