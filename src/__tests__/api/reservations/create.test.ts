@@ -311,4 +311,131 @@ describe("Create Reservation API Route", () => {
       RESERVATION_LIMITS.MAX_DAILY_RESERVATIONS - 1,
     );
   });
+
+  it("should validate additional users have verified emails and complete profiles", async () => {
+    (
+      jest.requireMock("next-auth/next") as { getServerSession: jest.Mock }
+    ).getServerSession.mockResolvedValue({
+      user: { id: mockUserId },
+    });
+
+    // @ts-expect-error - Ignore prisma self-referential type
+    const { prisma } = jest.requireMock("@/lib/prisma") as {
+      // @ts-expect-error - Ignore prisma self-referential type
+      prisma: jest.Mocked<typeof prisma>;
+    };
+
+    prisma.user.findMany.mockResolvedValue([
+      {
+        id: "123e4567-e89b-12d3-a456-426614174000",
+        emailVerified: false,
+        isProfileComplete: true,
+      },
+    ]);
+
+    const request = new Request(
+      "http://localhost:3000/api/reservations/create",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          reservationDate: validFutureDate,
+          additionalUsers: [
+            {
+              id: "123e4567-e89b-12d3-a456-426614174000",
+              name: "Test User",
+              email: "test@example.com",
+            },
+          ],
+        }),
+      },
+    ) as unknown as NextRequest;
+
+    const response = await POST(request);
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.error).toBe(
+      "All users must have verified emails and complete profiles",
+    );
+  });
+
+  it("should validate maximum number of additional users", async () => {
+    (
+      jest.requireMock("next-auth/next") as { getServerSession: jest.Mock }
+    ).getServerSession.mockResolvedValue({
+      user: { id: mockUserId },
+    });
+
+    const request = new Request(
+      "http://localhost:3000/api/reservations/create",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          reservationDate: validFutureDate,
+          additionalUsers: Array(4).fill({
+            id: "123e4567-e89b-12d3-a456-426614174000",
+            name: "Test User",
+            email: "test@example.com",
+          }),
+        }),
+      },
+    ) as unknown as NextRequest;
+
+    const response = await POST(request);
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.error).toContain("Maximum of 3 additional users allowed");
+  });
+
+  it("should prevent double booking for additional users", async () => {
+    (
+      jest.requireMock("next-auth/next") as { getServerSession: jest.Mock }
+    ).getServerSession.mockResolvedValue({
+      user: { id: mockUserId },
+    });
+
+    // @ts-expect-error - Ignore prisma self-referential type
+    const { prisma } = jest.requireMock("@/lib/prisma") as {
+      // @ts-expect-error - Ignore prisma self-referential type
+      prisma: jest.Mocked<typeof prisma>;
+    };
+
+    prisma.user.findMany.mockResolvedValue([
+      {
+        id: "123e4567-e89b-12d3-a456-426614174000",
+        emailVerified: true,
+        isProfileComplete: true,
+      },
+    ]);
+
+    prisma.reservationUser.findMany.mockResolvedValue([
+      {
+        userId: "123e4567-e89b-12d3-a456-426614174000",
+        status: ReservationUserStatus.ACTIVE,
+      },
+    ]);
+
+    const request = new Request(
+      "http://localhost:3000/api/reservations/create",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          reservationDate: validFutureDate,
+          additionalUsers: [
+            {
+              id: "123e4567-e89b-12d3-a456-426614174000",
+              name: "Test User",
+              email: "test@example.com",
+            },
+          ],
+        }),
+      },
+    ) as unknown as NextRequest;
+
+    const response = await POST(request);
+    expect(response.status).toBe(409);
+    const body = await response.json();
+    expect(body.error).toBe(
+      "One or more users already have a reservation for this date",
+    );
+  });
 });
