@@ -54,6 +54,7 @@ jest.mock("react-hook-form", () => ({
   zodResolver: jest.fn(),
 }));
 
+// Mock UI Components
 jest.mock("@/components/ui/Alert", () => ({
   Alert: jest.fn(({ children, variant }) => (
     <div data-testid="alert" data-variant={variant}>
@@ -107,7 +108,6 @@ jest.mock("@/components/reservation/UserSearch", () => ({
 jest.mock("@/services/reservationService", () => ({
   reservationService: {
     getAvailableDates: jest.fn(),
-    getUserReservations: jest.fn(),
     validateUsers: jest.fn(),
     checkDateAvailability: jest.fn(),
     createReservation: jest.fn(),
@@ -157,11 +157,6 @@ describe("ReservationForm", () => {
         maxCapacity: RESERVATION_LIMITS.MAX_DAILY_RESERVATIONS,
       },
     },
-    getUserReservations: {
-      // Changed from array to object
-      success: true,
-      data: [mockReservation], // Data should be an array of reservations
-    },
     validateUsers: {
       success: true,
       data: { valid: true },
@@ -175,7 +170,7 @@ describe("ReservationForm", () => {
     },
     createReservation: {
       success: true,
-      data: mockReservation, // Use the full mockReservation
+      data: mockReservation,
     },
   };
 
@@ -197,14 +192,13 @@ describe("ReservationForm", () => {
   });
 
   describe("Initialization", () => {
-    it("loads available dates and user reservations on mount", async () => {
+    it("loads available dates on mount", async () => {
       await act(async () => {
         render(<ReservationForm />);
       });
 
       await waitFor(() => {
         expect(reservationService.getAvailableDates).toHaveBeenCalled();
-        expect(reservationService.getUserReservations).toHaveBeenCalled();
       });
     });
 
@@ -219,7 +213,6 @@ describe("ReservationForm", () => {
 
       await waitFor(() => {
         expect(reservationService.getAvailableDates).toHaveBeenCalled();
-        expect(reservationService.getUserReservations).toHaveBeenCalled();
       });
 
       await act(async () => {
@@ -276,7 +269,6 @@ describe("ReservationForm", () => {
 
       await waitFor(() => {
         expect(reservationService.getAvailableDates).toHaveBeenCalled();
-        expect(reservationService.getUserReservations).toHaveBeenCalled();
       });
 
       const calendarEl = screen.getByTestId("calendar");
@@ -300,7 +292,6 @@ describe("ReservationForm", () => {
 
       await waitFor(() => {
         expect(reservationService.getAvailableDates).toHaveBeenCalled();
-        expect(reservationService.getUserReservations).toHaveBeenCalled();
       });
 
       const calendarEl = screen.getByTestId("calendar");
@@ -347,7 +338,6 @@ describe("ReservationForm", () => {
       const originalMock = useForm.getMockImplementation();
 
       try {
-        // Update the global mock's implementation
         useForm.mockImplementation(() => ({
           handleSubmit: (fn: any) => async (e?: any) => {
             e?.preventDefault?.();
@@ -415,7 +405,6 @@ describe("ReservationForm", () => {
           { timeout: 3000 },
         );
       } finally {
-        // Restore the original mock implementation
         useForm.mockImplementation(originalMock);
       }
     });
@@ -427,11 +416,6 @@ describe("ReservationForm", () => {
       (reservationService.getAvailableDates as jest.Mock).mockRejectedValue(
         new Error(errorMessage),
       );
-
-      (reservationService.getUserReservations as jest.Mock).mockResolvedValue({
-        success: true,
-        data: [],
-      });
 
       await act(async () => {
         render(<ReservationForm />);
@@ -468,12 +452,6 @@ describe("ReservationForm", () => {
         render(<ReservationForm />);
       });
 
-      const calendarEl = screen.getByTestId("calendar");
-      const dateButton = within(calendarEl).getByRole("button", { name: "26" });
-      await act(async () => {
-        await userEvent.click(dateButton);
-      });
-
       const form = screen.getByLabelText("reservation-form");
       await act(async () => {
         form.dispatchEvent(new Event("submit", { bubbles: true }));
@@ -488,10 +466,55 @@ describe("ReservationForm", () => {
   });
 
   describe("Form Submission", () => {
+    it("validates date availability before submission", async () => {
+      const selectedDate = new Date(2025, 0, 26);
+
+      await act(async () => {
+        render(<ReservationForm />);
+      });
+
+      const form = screen.getByLabelText("reservation-form");
+
+      await act(async () => {
+        await userEvent.click(form.querySelector('button[type="submit"]')!);
+      });
+
+      await waitFor(() => {
+        expect(reservationService.checkDateAvailability).toHaveBeenCalledWith(
+          selectedDate,
+        );
+      });
+    });
+
+    it("handles server validation errors during submission", async () => {
+      const errorMessage = "Cannot reserve more than 3 consecutive days";
+      (reservationService.checkDateAvailability as jest.Mock).mockResolvedValue(
+        {
+          success: false,
+          error: errorMessage,
+        },
+      );
+
+      await act(async () => {
+        render(<ReservationForm />);
+      });
+
+      const form = screen.getByLabelText("reservation-form");
+
+      await act(async () => {
+        await userEvent.click(form.querySelector('button[type="submit"]')!);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("alert-description")).toHaveTextContent(
+          errorMessage,
+        );
+      });
+    });
+
     it("redirects to dashboard on successful submission", async () => {
       const selectedDate = new Date(2025, 0, 26);
 
-      // Get the useForm mock and restore its original implementation
       const { useForm } = jest.requireMock("react-hook-form");
       useForm.mockImplementation(() => ({
         handleSubmit: (fn: any) => async (e?: any) => {

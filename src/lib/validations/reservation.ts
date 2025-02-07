@@ -1,9 +1,10 @@
 // src/lib/validations/reservation.ts
 
-import { addDays, subDays, startOfDay } from "date-fns";
+import { addDays, subDays, startOfDay, isBefore } from "date-fns";
 
 import { ConflictError } from "@/lib/errors/ApplicationErrors";
 import { prisma } from "@/lib/prisma";
+import { calculateConsecutiveDays } from "@/utils/dateUtils";
 
 export async function validateConsecutiveDates(
   userId: string,
@@ -34,29 +35,21 @@ export async function validateConsecutiveDates(
   const reservationDates = existingReservations.map((r) =>
     startOfDay(r.reservationDate).getTime(),
   );
-
-  // Add the new date
   reservationDates.push(startOfDay(checkDate).getTime());
 
-  // Sort dates
-  reservationDates.sort((a, b) => a - b);
-
-  // Find consecutive dates
-  let consecutiveDays = 1;
-  for (let i = 1; i < reservationDates.length; i++) {
-    const dayDiff =
-      (reservationDates[i] - reservationDates[i - 1]) / (1000 * 60 * 60 * 24);
-    if (dayDiff === 1) {
-      consecutiveDays++;
-      if (consecutiveDays > 3) {
-        throw new ConflictError(
-          "Cannot make reservation. Users are limited to 3 consecutive days.",
-        );
-      }
-    } else {
-      consecutiveDays = 1;
-    }
+  const maxConsecutive = calculateConsecutiveDays(reservationDates);
+  if (maxConsecutive > 3) {
+    throw new ConflictError(
+      "Cannot make reservation. Users are limited to 3 consecutive days.",
+    );
   }
 
   return true;
 }
+
+export const isBeforeNextDay = (date: Date): boolean => {
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(0, 0, 0, 0);
+  return isBefore(date, tomorrow);
+};

@@ -15,8 +15,8 @@ import { ValidationError, ConflictError } from "@/lib/errors/ApplicationErrors";
 import logger from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
 import { validateConsecutiveDates } from "@/lib/validations/reservation";
+import { isBeforeNextDay } from "@/lib/validations/reservation";
 import type { Availability } from "@/types/reservation";
-import { isBeforeNextDay } from "@/utils/reservationValidation";
 
 export const GET = withErrorHandler<Availability>(async (req: NextRequest) => {
   const requestId = crypto.randomUUID();
