@@ -397,3 +397,147 @@ describe("Consecutive Dates Validation", () => {
     expect(body.data.isAvailable).toBe(true);
   });
 });
+
+describe("Error Handling", () => {
+  const validFutureDate = "2025-02-07";
+  const mockUserId = "user123";
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date("2025-02-06"));
+
+    // Mock authenticated session by default for these tests
+    (
+      jest.requireMock("next-auth/next") as { getServerSession: jest.Mock }
+    ).getServerSession.mockResolvedValue({
+      user: { id: mockUserId },
+    });
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it("should handle database errors during capacity check", async () => {
+    // Mock database error
+    // @ts-expect-error - Ignore circular reference initialization
+    const { prisma } = jest.requireMock("@/lib/prisma") as {
+      // @ts-expect-error - Ignore prisma self-referential type
+      prisma: jest.Mocked<typeof prisma>;
+    };
+    prisma.dateCapacity.findUnique.mockRejectedValue(
+      new Error("Database connection error"),
+    );
+
+    const url = new URL(
+      "http://localhost:3000/api/reservations/check-availability",
+    );
+    url.searchParams.set("date", validFutureDate);
+
+    const request = new Request(url, {
+      method: "GET",
+    }) as unknown as NextRequest;
+
+    const response = await GET(request);
+    expect(response.status).toBe(500);
+
+    const body = await response.json();
+    expect(body.error).toBe("Internal server error");
+  });
+
+  it("should handle database errors during consecutive dates check", async () => {
+    // @ts-expect-error - Ignore circular reference initialization
+    const { prisma } = jest.requireMock("@/lib/prisma") as {
+      // @ts-expect-error - Ignore prisma self-referential type
+      prisma: jest.Mocked<typeof prisma>;
+    };
+
+    // Mock successful capacity check but failed reservations query
+    prisma.dateCapacity.findUnique.mockResolvedValue(null);
+    prisma.reservation.findMany.mockRejectedValue(
+      new Error("Database connection error"),
+    );
+
+    const url = new URL(
+      "http://localhost:3000/api/reservations/check-availability",
+    );
+    url.searchParams.set("date", validFutureDate);
+
+    const request = new Request(url, {
+      method: "GET",
+    }) as unknown as NextRequest;
+
+    const response = await GET(request);
+    expect(response.status).toBe(500);
+
+    const body = await response.json();
+    expect(body.error).toBe("Internal server error");
+  });
+
+  it("should handle unexpected errors in validateConsecutiveDates", async () => {
+    // Mock unexpected error that's not a ConflictError
+    // @ts-expect-error - Ignore circular reference initialization
+    const { prisma } = jest.requireMock("@/lib/prisma") as {
+      // @ts-expect-error - Ignore prisma self-referential type
+      prisma: jest.Mocked<typeof prisma>;
+    };
+
+    // Mock successful capacity check
+    prisma.dateCapacity.findUnique.mockResolvedValue(null);
+
+    // Mock reservations query to throw unexpected error
+    prisma.reservation.findMany.mockImplementation(() => {
+      throw new Error("Unexpected validation error");
+    });
+
+    const url = new URL(
+      "http://localhost:3000/api/reservations/check-availability",
+    );
+    url.searchParams.set("date", validFutureDate);
+
+    const request = new Request(url, {
+      method: "GET",
+    }) as unknown as NextRequest;
+
+    const response = await GET(request);
+    expect(response.status).toBe(500);
+
+    const body = await response.json();
+    expect(body.error).toBe("Internal server error");
+  });
+
+  it("should handle missing date parameter", async () => {
+    const url = new URL(
+      "http://localhost:3000/api/reservations/check-availability",
+    );
+    // Intentionally not setting date parameter
+
+    const request = new Request(url, {
+      method: "GET",
+    }) as unknown as NextRequest;
+
+    const response = await GET(request);
+    expect(response.status).toBe(400);
+
+    const body = await response.json();
+    expect(body.error).toBe("Date parameter is required");
+  });
+
+  it("should handle invalid date format", async () => {
+    const url = new URL(
+      "http://localhost:3000/api/reservations/check-availability",
+    );
+    url.searchParams.set("date", "invalid-date");
+
+    const request = new Request(url, {
+      method: "GET",
+    }) as unknown as NextRequest;
+
+    const response = await GET(request);
+    expect(response.status).toBe(400);
+
+    const body = await response.json();
+    expect(body.error).toBe("Invalid date format");
+  });
+});
