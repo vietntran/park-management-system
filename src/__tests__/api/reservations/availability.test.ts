@@ -24,8 +24,21 @@ jest.mock("@/lib/prisma", () => ({
 }));
 
 describe("Reservations Availability API Route", () => {
-  const validStartDate = "2025-02-07";
-  const validEndDate = "2025-02-10";
+  // Set a fixed date for all tests
+  const FIXED_DATE = "2025-02-07T00:00:00.000Z";
+  const validStartDate = "2025-02-08"; // One day after fixed date
+  const validEndDate = "2025-02-11"; // Four days after fixed date
+
+  beforeAll(() => {
+    // Mock Date.now and new Date()
+    const mockDate = new Date(FIXED_DATE);
+    jest.useFakeTimers();
+    jest.setSystemTime(mockDate);
+  });
+
+  afterAll(() => {
+    jest.useRealTimers();
+  });
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -160,7 +173,7 @@ describe("Reservations Availability API Route", () => {
   });
 
   it("should handle single day range (start = end)", async () => {
-    const singleDate = "2025-02-07";
+    const singleDate = validStartDate; // Using validStartDate instead of fixed date
     const url = new URL("http://localhost:3000/api/reservations/availability");
     url.searchParams.set("start", singleDate);
     url.searchParams.set("end", singleDate);
@@ -180,11 +193,8 @@ describe("Reservations Availability API Route", () => {
   });
 
   it("should reject queries with past start date", async () => {
-    jest.useFakeTimers();
-    jest.setSystemTime(new Date("2025-02-07")); // Set current date
-
-    const pastDate = "2025-01-01"; // Use a date just one month in the past
-    const nearFutureDate = "2025-02-28"; // Use a date within 3 months
+    const pastDate = "2025-02-06"; // One day before our fixed date
+    const nearFutureDate = "2025-02-28";
     const url = new URL("http://localhost:3000/api/reservations/availability");
     url.searchParams.set("start", pastDate);
     url.searchParams.set("end", nearFutureDate);
@@ -198,8 +208,6 @@ describe("Reservations Availability API Route", () => {
 
     const body = await response.json();
     expect(body.error).toBe("Start date must not be in the past");
-
-    jest.useRealTimers();
   });
 
   // Capacity Edge Cases Tests
@@ -213,18 +221,18 @@ describe("Reservations Availability API Route", () => {
     // Mock dates with different capacities
     prisma.dateCapacity.findMany.mockResolvedValue([
       {
-        date: new Date(validStartDate), // Feb 7 - Full
+        date: new Date(validStartDate), // Feb 8 - Full
         totalBookings: RESERVATION_LIMITS.MAX_DAILY_RESERVATIONS,
         maxCapacity: RESERVATION_LIMITS.MAX_DAILY_RESERVATIONS,
       },
       {
-        date: addDays(new Date(validStartDate), 1), // Feb 8 - Partial (30 bookings)
+        date: addDays(new Date(validStartDate), 1), // Feb 9 - Partial
         totalBookings: 30,
         maxCapacity: RESERVATION_LIMITS.MAX_DAILY_RESERVATIONS,
       },
-      // Feb 9 - No record, should be completely available
+      // Feb 10 - No record, should be completely available
       {
-        date: addDays(new Date(validStartDate), 3), // Feb 10 - Almost full (59 bookings)
+        date: addDays(new Date(validStartDate), 3), // Feb 11 - Almost full
         totalBookings: RESERVATION_LIMITS.MAX_DAILY_RESERVATIONS - 1,
         maxCapacity: RESERVATION_LIMITS.MAX_DAILY_RESERVATIONS,
       },
@@ -243,12 +251,12 @@ describe("Reservations Availability API Route", () => {
 
     const body = await response.json();
 
-    // Should exclude Feb 7 (full) but include Feb 8 (partial), Feb 9 (empty), and Feb 10 (almost full)
+    // Should exclude Feb 8 (full) but include Feb 9 (partial), Feb 10 (empty), and Feb 11 (almost full)
     expect(body.data.availableDates).toHaveLength(3);
     expect(body.data.availableDates).toEqual([
-      addDays(new Date(validStartDate), 1).toISOString(), // Feb 8
-      addDays(new Date(validStartDate), 2).toISOString(), // Feb 9
-      addDays(new Date(validStartDate), 3).toISOString(), // Feb 10
+      addDays(new Date(validStartDate), 1).toISOString(), // Feb 9
+      addDays(new Date(validStartDate), 2).toISOString(), // Feb 10
+      addDays(new Date(validStartDate), 3).toISOString(), // Feb 11
     ]);
   });
 

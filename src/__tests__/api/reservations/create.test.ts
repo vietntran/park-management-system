@@ -41,7 +41,20 @@ jest.mock("@/lib/prisma", () => ({
 
 describe("Create Reservation API Route", () => {
   const mockUserId = "test-user-id";
-  const validFutureDate = "2025-02-07";
+  // Set a fixed date for all tests
+  const FIXED_DATE = "2025-02-07T00:00:00.000Z";
+  const validFutureDate = "2025-02-08"; // One day after our fixed date
+
+  beforeAll(() => {
+    // Mock Date.now and new Date()
+    const mockDate = new Date(FIXED_DATE);
+    jest.useFakeTimers();
+    jest.setSystemTime(mockDate);
+  });
+
+  afterAll(() => {
+    jest.useRealTimers();
+  });
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -207,17 +220,17 @@ describe("Create Reservation API Route", () => {
     prisma.reservation.findMany.mockResolvedValue([
       {
         id: "1",
-        reservationDate: startOfDay(new Date("2025-02-04")),
+        reservationDate: startOfDay(new Date("2025-02-05")), // 2 days before
         status: ReservationStatus.ACTIVE,
       },
       {
         id: "2",
-        reservationDate: startOfDay(new Date("2025-02-05")),
+        reservationDate: startOfDay(new Date("2025-02-06")), // 1 day before
         status: ReservationStatus.ACTIVE,
       },
       {
         id: "3",
-        reservationDate: startOfDay(new Date("2025-02-06")),
+        reservationDate: startOfDay(new Date("2025-02-07")), // current day
         status: ReservationStatus.ACTIVE,
       },
     ]);
