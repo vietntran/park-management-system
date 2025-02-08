@@ -6,6 +6,7 @@ import { NextRequest } from "next/server";
 
 import { POST } from "@/app/api/reservations/[id]/cancel/route";
 import { prisma } from "@/lib/prisma";
+import { RouteContext } from "@/types/route";
 
 // Mock the minimum required imports
 jest.mock("next-auth/next", () => ({
@@ -331,6 +332,170 @@ describe("Cancel Reservation API Route", () => {
     expect(prisma.dateCapacity.update).toHaveBeenCalledWith({
       where: { date: mockReservationDate },
       data: { totalBookings: { decrement: 1 } },
+    });
+  });
+  describe("Error Handling", () => {
+    it("should handle missing route parameters", async () => {
+      // Mock authenticated session
+      (
+        jest.requireMock("next-auth/next") as { getServerSession: jest.Mock }
+      ).getServerSession.mockResolvedValue({
+        user: { id: mockUserId },
+      });
+
+      const request = new Request(
+        "http://localhost:3000/api/reservations/cancel",
+        {
+          method: "POST",
+        },
+      ) as unknown as NextRequest;
+
+      // Pass empty object as context, casting as RouteContext and omitting the params property entirely
+      const response = await POST(request, {} as RouteContext);
+      expect(response.status).toBe(400);
+
+      const body = await response.json();
+      expect(body.error).toBe("Reservation ID is required");
+    });
+
+    it("should handle database transaction failure and rollback", async () => {
+      // Mock authenticated session
+      (
+        jest.requireMock("next-auth/next") as { getServerSession: jest.Mock }
+      ).getServerSession.mockResolvedValue({
+        user: { id: mockUserId },
+      });
+
+      // @ts-expect-error - Ignore circular reference initialization
+      const { prisma } = jest.requireMock("@/lib/prisma") as {
+        // @ts-expect-error - Ignore prisma self-referential type
+        prisma: jest.Mocked<typeof prisma>;
+      };
+
+      // Mock active reservation with primary user
+      prisma.reservation.findUnique.mockResolvedValue({
+        id: mockReservationId,
+        primaryUserId: mockUserId,
+        status: ReservationStatus.ACTIVE,
+        reservationDate: mockReservationDate,
+        reservationUsers: [
+          { userId: mockUserId, status: ReservationUserStatus.ACTIVE },
+        ],
+      });
+
+      // Mock transaction to fail before any operations
+      prisma.$transaction.mockImplementation(() => {
+        throw new Error("Database error");
+      });
+
+      const request = new Request(
+        "http://localhost:3000/api/reservations/cancel",
+        {
+          method: "POST",
+        },
+      ) as unknown as NextRequest;
+
+      const context = {
+        params: { id: mockReservationId },
+      };
+
+      const response = await POST(request, context);
+      expect(response.status).toBe(500);
+
+      const body = await response.json();
+      expect(body.error).toBe("Internal server error");
+
+      // Verify transaction was attempted
+      expect(prisma.$transaction).toHaveBeenCalled();
+    });
+
+    // This resolves a Typescript error in the test
+    type PrismaOperation =
+      | Promise<unknown>[]
+      // @ts-expect-error - Ignore prisma self-referential type
+      | ((prisma: typeof prisma) => Promise<unknown>);
+    it("should handle concurrent cancellation attempts", async () => {
+      // Mock authenticated session
+      (
+        jest.requireMock("next-auth/next") as { getServerSession: jest.Mock }
+      ).getServerSession.mockResolvedValue({
+        user: { id: mockUserId },
+      });
+
+      // @ts-expect-error - Ignore circular reference initialization
+      const { prisma } = jest.requireMock("@/lib/prisma") as {
+        // @ts-expect-error - Ignore prisma self-referential type
+        prisma: jest.Mocked<typeof prisma>;
+      };
+
+      // Mock active reservation
+      const mockReservation = {
+        id: mockReservationId,
+        primaryUserId: mockUserId,
+        status: ReservationStatus.ACTIVE,
+        reservationDate: mockReservationDate,
+        reservationUsers: [
+          { userId: mockUserId, status: ReservationUserStatus.ACTIVE },
+        ],
+      };
+
+      // First call returns active reservation, second call returns cancelled
+      let callCount = 0;
+      prisma.reservation.findUnique.mockImplementation(() => {
+        callCount++;
+        return Promise.resolve(
+          callCount === 1
+            ? mockReservation
+            : {
+                ...mockReservation,
+                status: ReservationStatus.CANCELLED,
+              },
+        );
+      });
+
+      // Reset transaction mock to succeed
+      prisma.$transaction.mockImplementation(
+        async (operations: PrismaOperation) => {
+          if (Array.isArray(operations)) {
+            return Promise.all(operations);
+          }
+          // If it's a function, call it with prisma
+          if (typeof operations === "function") {
+            return operations(prisma);
+          }
+          return operations;
+        },
+      );
+
+      const request = new Request(
+        "http://localhost:3000/api/reservations/cancel",
+        {
+          method: "POST",
+        },
+      ) as unknown as NextRequest;
+
+      const context = {
+        params: { id: mockReservationId },
+      };
+
+      // Send two concurrent requests
+      const [response1, response2] = await Promise.all([
+        POST(request, context),
+        POST(request, context),
+      ]);
+
+      // First request should succeed
+      expect(response1.status).toBe(200);
+      const body1 = await response1.json();
+      expect(body1.success).toBe(true);
+
+      // Second request should fail as already cancelled
+      expect(response2.status).toBe(400);
+      const body2 = await response2.json();
+      expect(body2.error).toBe("Reservation is already cancelled");
+
+      // Verify transaction was only executed once
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
     });
   });
 });
