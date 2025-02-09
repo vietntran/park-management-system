@@ -1,0 +1,211 @@
+/**
+ * @jest-environment node
+ */
+import { hash } from "bcryptjs";
+import { NextRequest } from "next/server";
+
+import { POST } from "@/app/api/auth/register/route";
+import { HTTP_STATUS } from "@/constants/http";
+import { prisma } from "@/lib/prisma";
+import { emailService } from "@/services/emailService";
+
+// Mock required dependencies
+jest.mock("bcryptjs", () => ({
+  hash: jest.fn(),
+}));
+
+// Mock Next.js headers
+jest.mock("next/headers", () => ({
+  headers: jest.fn(() => new Map([["x-forwarded-for", "127.0.0.1"]])),
+}));
+
+jest.mock("@/lib/prisma", () => ({
+  prisma: {
+    $transaction: jest.fn(async (callback) => callback(prisma)),
+    user: {
+      findUnique: jest.fn(),
+      create: jest.fn(),
+    },
+    verificationToken: {
+      create: jest.fn(),
+    },
+  },
+}));
+
+jest.mock("@/services/emailService", () => ({
+  emailService: {
+    sendVerificationEmail: jest.fn(),
+  },
+}));
+
+describe("Auth register API Route", () => {
+  const FIXED_DATE = "2025-02-07T00:00:00.000Z";
+
+  // Valid test data
+  const validRegistrationData = {
+    email: "test@example.com",
+    password: "Password123!@#", // Increased complexity to meet requirements
+    name: "Test User",
+    phone: "1234567890",
+    address: {
+      line1: "123 Test St",
+      line2: "Apt 4",
+      city: "Test City",
+      state: "TS",
+      zipCode: "12345",
+    },
+    acceptTerms: true,
+  };
+
+  beforeAll(() => {
+    // Mock Date.now and new Date()
+    const mockDate = new Date(FIXED_DATE);
+    jest.useFakeTimers();
+    jest.setSystemTime(mockDate);
+  });
+
+  afterAll(() => {
+    jest.useRealTimers();
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+
+    // Reset database mocks
+    // @ts-expect-error - Ignore circular reference initialization
+    const { prisma } = jest.requireMock("@/lib/prisma") as {
+      // @ts-expect-error - Ignore prisma self-referential type
+      prisma: jest.Mocked<typeof prisma>;
+    };
+    prisma.user.findUnique.mockResolvedValue(null);
+
+    // Mock successful user creation
+    prisma.user.create.mockResolvedValue({
+      id: "test-user-id",
+      email: validRegistrationData.email,
+      name: validRegistrationData.name,
+      phone: validRegistrationData.phone,
+      password: "hashed_password",
+      phoneVerified: false,
+      isProfileComplete: false,
+      emailVerified: null,
+      createdAt: new Date(FIXED_DATE),
+      updatedAt: new Date(FIXED_DATE),
+    });
+
+    // Mock successful verification token creation
+    prisma.verificationToken.create.mockResolvedValue({
+      token: "test-verification-token",
+      expires: new Date(FIXED_DATE),
+      identifier: validRegistrationData.email,
+    });
+
+    // Mock successful password hashing
+    (hash as jest.Mock).mockResolvedValue("hashed_password");
+
+    // Mock successful email sending
+    const { emailService } = jest.requireMock("@/services/emailService") as {
+      emailService: { sendVerificationEmail: jest.Mock };
+    };
+    emailService.sendVerificationEmail.mockResolvedValue(undefined);
+  });
+
+  describe("Input Validation", () => {
+    it("should successfully create a user with valid registration data", async () => {
+      const request = new Request("http://localhost:3000/api/auth/register", {
+        method: "POST",
+        body: JSON.stringify(validRegistrationData),
+      }) as unknown as NextRequest;
+
+      const response = await POST(request);
+      expect(response.status).toBe(HTTP_STATUS.CREATED);
+
+      const body = await response.json();
+      expect(body.data).toEqual({
+        user: {
+          id: "test-user-id",
+          email: validRegistrationData.email,
+          name: validRegistrationData.name,
+        },
+      });
+
+      // Verify user creation was called with correct data
+      expect(prisma.user.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            email: validRegistrationData.email,
+            name: validRegistrationData.name,
+            phone: validRegistrationData.phone,
+          }),
+        }),
+      );
+
+      // Verify verification token was created
+      expect(prisma.verificationToken.create).toHaveBeenCalled();
+
+      // Verify verification email was sent
+      expect(emailService.sendVerificationEmail).toHaveBeenCalledWith(
+        validRegistrationData.email,
+        "test-verification-token",
+      );
+    });
+
+    it("should return 400 when email is missing", async () => {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars -- Destructuring to exclude email field for invalid data test
+      const { email, ...invalidData } = validRegistrationData;
+      const request = new Request("http://localhost:3000/api/auth/register", {
+        method: "POST",
+        body: JSON.stringify(invalidData),
+      }) as unknown as NextRequest;
+
+      const response = await POST(request);
+      expect(response.status).toBe(HTTP_STATUS.BAD_REQUEST);
+
+      const body = await response.json();
+      expect(body.error).toBe("Required");
+    });
+
+    it("should return 400 when email format is invalid", async () => {
+      const invalidData = { ...validRegistrationData, email: "invalid-email" };
+      const request = new Request("http://localhost:3000/api/auth/register", {
+        method: "POST",
+        body: JSON.stringify(invalidData),
+      }) as unknown as NextRequest;
+
+      const response = await POST(request);
+      expect(response.status).toBe(HTTP_STATUS.BAD_REQUEST);
+
+      const body = await response.json();
+      expect(body.error).toContain("Invalid email");
+    });
+
+    it("should return 400 when password is too short", async () => {
+      const invalidData = { ...validRegistrationData, password: "short" };
+      const request = new Request("http://localhost:3000/api/auth/register", {
+        method: "POST",
+        body: JSON.stringify(invalidData),
+      }) as unknown as NextRequest;
+
+      const response = await POST(request);
+      expect(response.status).toBe(HTTP_STATUS.BAD_REQUEST);
+
+      const body = await response.json();
+      expect(body.error).toBe("Password must be at least 12 characters");
+    });
+
+    it("should return 400 when name is missing", async () => {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars -- Destructuring to exclude name field for invalid data test
+      const { name, ...invalidData } = validRegistrationData;
+      const request = new Request("http://localhost:3000/api/auth/register", {
+        method: "POST",
+        body: JSON.stringify(invalidData),
+      }) as unknown as NextRequest;
+
+      const response = await POST(request);
+      expect(response.status).toBe(HTTP_STATUS.BAD_REQUEST);
+
+      const body = await response.json();
+      expect(body.error).toBe("Required");
+    });
+  });
+});
