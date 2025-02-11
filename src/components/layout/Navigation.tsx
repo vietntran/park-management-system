@@ -1,74 +1,143 @@
 "use client";
 
-import { Menu } from "lucide-react";
+import { Menu, User, LogOut } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useSession, signOut } from "next-auth/react";
 import { useState } from "react";
+
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/DropdownMenu";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 const Navigation = () => {
   const [isOpen, setIsOpen] = useState(false);
   const pathname = usePathname();
+  const { data: session } = useSession();
 
-  const navigation = [
+  const authNavigation = [
     { name: "Home", href: "/" },
     { name: "Reservations", href: "/reservations" },
+  ];
+
+  const publicNavigation = [
+    { name: "Home", href: "/" },
     { name: "Login", href: "/auth/login" },
     { name: "Register", href: "/register" },
   ];
 
+  const navigation = session ? authNavigation : publicNavigation;
+
   return (
-    <nav className="bg-white shadow">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16">
-          <div className="flex">
-            <div className="flex-shrink-0 flex items-center">
-              <span className="text-xl font-bold">Park Management</span>
-            </div>
-            <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
+    <nav className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="container flex h-14 items-center">
+        <div className="flex flex-1">
+          <div className="mr-4 flex">
+            <Link href="/" className="mr-6 flex items-center space-x-2">
+              <span className="font-bold">Park Management</span>
+            </Link>
+
+            <nav className="hidden md:flex items-center space-x-6 text-sm font-medium">
               {navigation.map((item) => (
                 <Link
                   key={item.name}
                   href={item.href}
-                  className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${
+                  className={cn(
+                    "transition-colors hover:text-foreground/80",
                     pathname === item.href
-                      ? "border-blue-500 text-gray-900"
-                      : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
-                  }`}
+                      ? "text-foreground"
+                      : "text-foreground/60",
+                  )}
                 >
                   {item.name}
                 </Link>
               ))}
-            </div>
-          </div>
-
-          <div className="sm:hidden flex items-center">
-            <button
-              onClick={() => setIsOpen(!isOpen)}
-              className="p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100"
-            >
-              <Menu className="h-6 w-6" />
-            </button>
+            </nav>
           </div>
         </div>
+
+        {session ? (
+          <div className="hidden md:flex items-center space-x-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <User className="h-5 w-5" />
+                  <span className="sr-only">Open user menu</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuItem asChild>
+                  <Link href="/profile" className="cursor-pointer w-full">
+                    <User className="mr-2 h-4 w-4" />
+                    <span>Profile</span>
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => signOut()}
+                  className="cursor-pointer text-destructive focus:text-destructive w-full"
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Log out</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        ) : null}
+
+        <Button
+          variant="ghost"
+          className="md:hidden"
+          size="icon"
+          onClick={() => setIsOpen(!isOpen)}
+        >
+          <Menu className="h-5 w-5" />
+          <span className="sr-only">Toggle menu</span>
+        </Button>
       </div>
 
       {isOpen && (
-        <div className="sm:hidden">
-          <div className="pt-2 pb-3 space-y-1">
+        <div className="md:hidden border-t">
+          <div className="container grid gap-3 p-4">
             {navigation.map((item) => (
               <Link
                 key={item.name}
                 href={item.href}
-                className={`block px-3 py-2 text-base font-medium ${
-                  pathname === item.href
-                    ? "bg-blue-50 border-l-4 border-blue-500 text-blue-700"
-                    : "border-l-4 border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50 hover:border-gray-300"
-                }`}
                 onClick={() => setIsOpen(false)}
+                className={cn(
+                  "text-sm font-medium transition-colors",
+                  pathname === item.href
+                    ? "text-foreground"
+                    : "text-foreground/60 hover:text-foreground/80",
+                )}
               >
                 {item.name}
               </Link>
             ))}
+            {session && (
+              <>
+                <Link
+                  href="/profile"
+                  onClick={() => setIsOpen(false)}
+                  className="text-sm font-medium text-foreground/60 transition-colors hover:text-foreground/80"
+                >
+                  Profile
+                </Link>
+                <button
+                  onClick={() => {
+                    setIsOpen(false);
+                    signOut();
+                  }}
+                  className="text-sm font-medium text-destructive transition-colors hover:text-destructive/90 text-left"
+                >
+                  Log out
+                </button>
+              </>
+            )}
           </div>
         </div>
       )}
