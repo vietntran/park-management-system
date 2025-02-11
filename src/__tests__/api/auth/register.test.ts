@@ -12,6 +12,7 @@ import { createRateLimiter } from "@/services/rateLimitService";
 import {
   createMockUser,
   createMockVerificationToken,
+  createRegistrationData,
 } from "@/test-utils/factories";
 import type { RateLimitProvider } from "@/types/rateLimit";
 
@@ -246,6 +247,87 @@ describe("Auth register API Route", () => {
 
       const body = await response.json();
       expect(body.error).toBe("Required");
+    });
+
+    it("should validate password complexity requirements", async () => {
+      const testCases = [
+        {
+          password: "nouppercaseornumber!",
+          error: "Password must contain at least one uppercase letter",
+        },
+        {
+          password: "NoSpecialCharacter123",
+          error:
+            'Password must contain at least one special character (!@#$%^&*(),.?":{}|<>)',
+        },
+        {
+          password: "no_numbers_here!A",
+          error: "Password must contain at least one number",
+        },
+      ];
+
+      for (const testCase of testCases) {
+        const invalidData = createRegistrationData({
+          password: testCase.password,
+        });
+
+        const request = new Request("http://localhost:3000/api/auth/register", {
+          method: "POST",
+          body: JSON.stringify(invalidData),
+        }) as unknown as NextRequest;
+
+        const response = await POST(request);
+        expect(response.status).toBe(HTTP_STATUS.BAD_REQUEST);
+
+        const body = await response.json();
+        expect(body.error).toBe(testCase.error);
+      }
+    });
+
+    it("should validate state field length", async () => {
+      const invalidData = createRegistrationData({
+        address: {
+          line1: "123 Test St",
+          line2: "Apt 4",
+          city: "Test City",
+          state: "INVALID", // Too long for state code
+          zipCode: "12345",
+        },
+      });
+
+      const request = new Request("http://localhost:3000/api/auth/register", {
+        method: "POST",
+        body: JSON.stringify(invalidData),
+      }) as unknown as NextRequest;
+
+      const response = await POST(request);
+      expect(response.status).toBe(HTTP_STATUS.BAD_REQUEST);
+
+      const body = await response.json();
+      expect(body.error).toBe("State must be 2 letters");
+    });
+
+    it("should validate zip code format", async () => {
+      const invalidData = createRegistrationData({
+        address: {
+          line1: "123 Test St",
+          line2: "Apt 4",
+          city: "Test City",
+          state: "TS",
+          zipCode: "1234", // Invalid zip code format
+        },
+      });
+
+      const request = new Request("http://localhost:3000/api/auth/register", {
+        method: "POST",
+        body: JSON.stringify(invalidData),
+      }) as unknown as NextRequest;
+
+      const response = await POST(request);
+      expect(response.status).toBe(HTTP_STATUS.BAD_REQUEST);
+
+      const body = await response.json();
+      expect(body.error).toBe("Invalid ZIP code");
     });
   });
 
