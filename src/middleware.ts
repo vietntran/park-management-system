@@ -23,10 +23,10 @@ export async function middleware(request: NextRequest) {
       );
     }
 
-    // Add userId to context once we have the token
     logContext.userId = token.sub;
 
     if (!token.isProfileComplete) {
+      // Allow access to profile/complete
       if (request.nextUrl.pathname === "/profile/complete") {
         return NextResponse.next();
       }
@@ -36,14 +36,14 @@ export async function middleware(request: NextRequest) {
         redirectTo: "/profile/complete",
       });
 
+      // Create redirect response
       const response = NextResponse.redirect(
         new URL("/profile/complete", request.url),
       );
 
-      response.cookies.set(
-        "redirectAfterProfile",
-        request.nextUrl.pathname + request.nextUrl.search,
-      );
+      // Store original path including search params
+      const returnPath = request.nextUrl.pathname + request.nextUrl.search;
+      response.cookies.set("redirectAfterProfile", returnPath);
 
       return response;
     }
@@ -63,12 +63,11 @@ export async function middleware(request: NextRequest) {
   }
 }
 
-// Config remains the same
 export const config = {
   matcher: [
     "/dashboard/:path*",
     "/api/reservations/:path*",
     "/reservations/:path*",
-    "/profile/complete", // Prevent redirect loops
+    "/profile/:path*",
   ],
 };
