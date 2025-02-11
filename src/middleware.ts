@@ -7,6 +7,11 @@ import type { LogContext } from "@/lib/logger";
 
 export async function middleware(request: NextRequest) {
   try {
+    // Skip auth check for public API routes if needed
+    if (request.nextUrl.pathname.startsWith("/api/public")) {
+      return NextResponse.next();
+    }
+
     const token = await getToken({ req: request });
     const logContext: LogContext = {
       path: request.nextUrl.pathname,
@@ -25,9 +30,13 @@ export async function middleware(request: NextRequest) {
 
     logContext.userId = token.sub;
 
+    // Handle profile completion status
     if (!token.isProfileComplete) {
-      // Allow access to profile/complete
-      if (request.nextUrl.pathname === "/profile/complete") {
+      // Allow access to profile/complete and its API
+      if (
+        request.nextUrl.pathname === "/profile/complete" ||
+        request.nextUrl.pathname === "/api/auth/profile/complete"
+      ) {
         return NextResponse.next();
       }
 
@@ -48,6 +57,18 @@ export async function middleware(request: NextRequest) {
       return response;
     }
 
+    // Redirect completed profiles away from profile/complete page
+    if (
+      token.isProfileComplete &&
+      request.nextUrl.pathname === "/profile/complete"
+    ) {
+      edgeLogger.info("Completed profile accessing completion page", {
+        ...logContext,
+        redirectTo: "/profile",
+      });
+      return NextResponse.redirect(new URL("/profile", request.url));
+    }
+
     return NextResponse.next();
   } catch (error) {
     const errorContext: LogContext = {
@@ -65,9 +86,14 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/dashboard/:path*",
-    "/api/reservations/:path*",
-    "/reservations/:path*",
-    "/profile/:path*",
+    /*
+     * Match all request paths except for the ones starting with:
+     * - auth (authentication routes)
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * - public folder
+     */
+    "/((?!auth|_next/static|_next/image|favicon.ico|public).*)",
   ],
 };

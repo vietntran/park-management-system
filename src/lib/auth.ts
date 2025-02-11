@@ -56,6 +56,7 @@ export const authOptions: NextAuthOptions = {
           email: profile.email,
           phoneVerified: false,
           emailVerified: new Date(),
+          isProfileComplete: false,
         };
       },
     }),
@@ -194,23 +195,22 @@ export const authOptions: NextAuthOptions = {
     async signIn({ user, account }) {
       if (account?.type === "oauth") {
         try {
-          // Check and update profile completion status for OAuth users
+          // Only update emailVerified status, not isProfileComplete
           const existingUser = await prisma.user.findUnique({
             where: { email: user.email! },
-            select: { isProfileComplete: true, emailVerified: true },
+            select: { emailVerified: true },
           });
 
           if (existingUser) {
             await prisma.user.update({
               where: { email: user.email! },
               data: {
-                isProfileComplete: true,
                 emailVerified: existingUser.emailVerified || new Date(),
               },
             });
           }
         } catch (error) {
-          logger.error("Error updating profile completion status:", {
+          logger.error("Error updating user after OAuth sign in:", {
             error: error instanceof Error ? error : new Error(String(error)),
             userId: user.id,
             email: user.email,

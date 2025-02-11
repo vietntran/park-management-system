@@ -310,4 +310,95 @@ describe("Middleware", () => {
       );
     });
   });
+
+  describe("Public Routes and API Handling", () => {
+    it("should allow access to public API routes", async () => {
+      const url = new URL("http://localhost:3000/api/public/some-endpoint");
+      const request = {
+        nextUrl: url,
+        url: url.toString(),
+        method: "GET",
+        headers: new Headers(),
+      } as unknown as NextRequest;
+
+      const response = await middleware(request);
+      expect(response?.status).toBe(200); // NextResponse.next()
+    });
+
+    it("should allow access to profile completion API with incomplete profile", async () => {
+      (getToken as jest.Mock).mockResolvedValue({
+        sub: "user123",
+        isProfileComplete: false,
+      });
+
+      const url = new URL("http://localhost:3000/api/auth/profile/complete");
+      const request = {
+        nextUrl: url,
+        url: url.toString(),
+        method: "POST",
+        headers: new Headers(),
+      } as unknown as NextRequest;
+
+      const response = await middleware(request);
+      expect(response?.status).toBe(200); // NextResponse.next()
+    });
+  });
+
+  describe("Protected Resource Access", () => {
+    it("should protect static resources based on matcher", async () => {
+      const url = new URL("http://localhost:3000/resources/protected-file.pdf");
+      const request = {
+        nextUrl: url,
+        url: url.toString(),
+        method: "GET",
+        headers: new Headers(),
+      } as unknown as NextRequest;
+
+      const response = await middleware(request);
+      expect(response?.status).toBe(307);
+      expect(response?.headers.get("Location")).toContain("/auth/login");
+    });
+  });
+
+  // Update the Profile Completion Page Access describe block
+  describe("Profile Completion Page Access", () => {
+    it("should redirect completed profiles away from profile/complete page", async () => {
+      (getToken as jest.Mock).mockResolvedValue({
+        sub: "user123",
+        isProfileComplete: true,
+      });
+
+      const url = new URL("http://localhost:3000/profile/complete");
+      const request = {
+        nextUrl: url,
+        url: url.toString(),
+        method: "GET",
+        headers: new Headers(),
+      } as unknown as NextRequest;
+
+      const response = await middleware(request);
+      expect(response?.status).toBe(307);
+      expect(response?.headers.get("Location")).toBe(
+        "http://localhost:3000/profile",
+      );
+    });
+
+    it("should allow access to profile completion API with incomplete profile", async () => {
+      (getToken as jest.Mock).mockResolvedValue({
+        sub: "user123",
+        isProfileComplete: false,
+      });
+
+      const url = new URL("http://localhost:3000/api/auth/profile/complete");
+      const request = {
+        nextUrl: url,
+        url: url.toString(),
+        method: "POST",
+        headers: new Headers(),
+      } as unknown as NextRequest;
+
+      const response = await middleware(request);
+      expect(response?.status).toBe(200); // NextResponse.next()
+    });
+  });
 });
