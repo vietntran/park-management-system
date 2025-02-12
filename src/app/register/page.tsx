@@ -3,15 +3,18 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
-import { useCallback, useState } from "react"; // Add useCallback import
+import { useCallback, useState } from "react";
 
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/form/Button";
 import { FormContainer } from "@/components/ui/form/FormContainer";
 import { TextField } from "@/components/ui/form/TextField";
 import { typedFetch } from "@/lib/utils";
-import { registerSchema } from "@/lib/validations/auth";
-import type { RegisterFormData, RegistrationResponse } from "@/types/auth";
+import { initialRegistrationSchema } from "@/lib/validations/auth";
+import type {
+  InitialRegistrationData,
+  RegistrationResponse,
+} from "@/types/auth";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -32,12 +35,11 @@ export default function RegisterPage() {
       const formValues = {
         name: formData.get("name"),
         email: formData.get("email"),
-        phone: formData.get("phone"),
         password: formData.get("password"),
       };
 
       // Validate form data using Zod schema
-      const result = registerSchema.safeParse(formValues);
+      const result = initialRegistrationSchema.safeParse(formValues);
 
       if (!result.success) {
         setError(result.error.errors[0].message);
@@ -45,7 +47,7 @@ export default function RegisterPage() {
         return;
       }
 
-      const registrationData: RegisterFormData = result.data;
+      const registrationData: InitialRegistrationData = result.data;
 
       try {
         const response = await typedFetch<RegistrationResponse>(
@@ -90,26 +92,36 @@ export default function RegisterPage() {
       }
     },
     [router, from],
-  ); // Add dependencies
+  );
 
   const handleGoogleSignIn = useCallback(() => {
     signIn("google", { callbackUrl: from });
-  }, [from]); // Add dependency
+  }, [from]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12 sm:px-6 lg:px-8">
       <FormContainer
         title="Create your account"
         subtitle={
-          <>
-            Or{" "}
-            <Link
-              href="/login"
-              className="font-medium text-blue-600 hover:text-blue-500"
-            >
-              sign in to your account
-            </Link>
-          </>
+          <div className="text-center">
+            <div className="mb-4">
+              <span className="inline-flex items-center rounded-full bg-blue-100 px-3 py-1 text-sm font-medium text-blue-800">
+                Step 1 of 2: Basic Registration
+              </span>
+              <div className="mt-2 text-sm text-gray-600">
+                Next step: Complete your profile to enable reservations
+              </div>
+            </div>
+            <div className="text-sm text-gray-600">
+              Or{" "}
+              <Link
+                href="/login"
+                className="font-medium text-blue-600 hover:text-blue-500"
+              >
+                sign in to your account
+              </Link>
+            </div>
+          </div>
         }
       >
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
@@ -133,22 +145,13 @@ export default function RegisterPage() {
             />
 
             <TextField
-              name="phone"
-              type="tel"
-              label="Phone Number"
-              required
-              autoComplete="tel"
-              placeholder="Enter your phone number"
-            />
-
-            <TextField
               name="password"
               type="password"
               label="Password"
               required
-              minLength={8}
               autoComplete="new-password"
-              placeholder="Create a password (minimum 8 characters)"
+              placeholder="Create a password"
+              description="Must be at least 12 characters with uppercase, lowercase, number, and special character"
             />
           </div>
 

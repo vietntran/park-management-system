@@ -2,13 +2,13 @@
 
 import { z } from "zod";
 
-// Password validation helpers
+// Base validation helpers
 const hasUpperCase = (str: string) => /[A-Z]/.test(str);
 const hasLowerCase = (str: string) => /[a-z]/.test(str);
 const hasNumber = (str: string) => /[0-9]/.test(str);
 const hasSpecialChar = (str: string) => /[!@#$%^&*(),.?":{}|<>]/.test(str);
 
-// Reusable password schema with detailed error messages
+// Core schemas
 export const passwordSchema = z
   .string()
   .min(12, "Password must be at least 12 characters")
@@ -21,19 +21,22 @@ export const passwordSchema = z
     'Password must contain at least one special character (!@#$%^&*(),.?":{}|<>)',
   );
 
-// Email schema with consistent validation
 export const emailSchema = z
   .string()
   .min(1, "Email is required")
   .email("Invalid email address")
   .regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, "Invalid email format");
 
-// Common schemas
-export const loginSchema = z.object({
-  email: emailSchema,
-  password: passwordSchema,
-});
+export const nameSchema = z
+  .string()
+  .min(2, "Name must be at least 2 characters")
+  .max(100, "Name cannot exceed 100 characters")
+  .regex(
+    /^[a-zA-Z\s-']+$/,
+    "Name can only contain letters, spaces, hyphens, and apostrophes",
+  );
 
+// Address schema (used for profile completion)
 export const addressSchema = z.object({
   line1: z.string().min(1, "Address line 1 is required"),
   line2: z.string().optional(),
@@ -42,46 +45,52 @@ export const addressSchema = z.object({
   zipCode: z.string().regex(/^\d{5}(-\d{4})?$/, "Invalid ZIP code"),
 });
 
-export const registerSchema = z.object({
+// Phone schema (used for profile completion)
+export const phoneSchema = z
+  .string()
+  .min(1, "Phone number is required")
+  .regex(/^\+?[1-9]\d{1,14}$/, {
+    message:
+      "Please enter a valid phone number (e.g., +1234567890 or 1234567890)",
+  });
+
+// Stage 1: Initial Registration
+export const initialRegistrationSchema = z.object({
   email: emailSchema,
   password: passwordSchema,
-  name: z
-    .string()
-    .min(2, "Name must be at least 2 characters")
-    .max(100, "Name cannot exceed 100 characters")
-    .regex(
-      /^[a-zA-Z\s-']+$/,
-      "Name can only contain letters, spaces, hyphens, and apostrophes",
-    ),
-  phone: z
-    .string()
-    .regex(/^\d{10}$/, "Phone number must be exactly 10 digits")
-    .optional(),
-  address: addressSchema.optional(),
+  name: nameSchema,
 });
 
-export const emailVerificationSchema = z.object({
-  token: z.string().min(1, "Verification token is required"),
+// Stage 2: Profile Completion (required for reservations)
+export const profileCompletionSchema = z.object({
+  phone: phoneSchema,
+  address: addressSchema,
+});
+
+// Combined schema for full profile
+export const fullProfileSchema = initialRegistrationSchema
+  .omit({ password: true })
+  .merge(profileCompletionSchema);
+
+// Common schema combinations
+export const loginSchema = z.object({
+  email: emailSchema,
+  password: passwordSchema,
 });
 
 export const passwordResetSchema = z.object({
-  email: z.string().email("Invalid email address"),
+  email: emailSchema,
 });
 
 export const newPasswordSchema = z.object({
   token: z.string().min(1, "Reset token is required"),
-  password: registerSchema.shape.password,
+  password: passwordSchema,
 });
 
-export const profileUpdateSchema = registerSchema.partial().omit({
-  password: true,
-});
-
-export const phoneSchema = z
-  .string()
-  .regex(/^\+?[1-9]\d{1,14}$/, {
-    message:
-      "If provided, phone number must be in international format (e.g., +1234567890)",
-  })
-  .optional()
-  .or(z.literal("")); // Allow empty string for form handling
+// Types
+export type InitialRegistrationData = z.infer<typeof initialRegistrationSchema>;
+export type ProfileCompletionData = z.infer<typeof profileCompletionSchema>;
+export type FullProfileData = z.infer<typeof fullProfileSchema>;
+export type LoginData = z.infer<typeof loginSchema>;
+export type PasswordResetData = z.infer<typeof passwordResetSchema>;
+export type NewPasswordData = z.infer<typeof newPasswordSchema>;

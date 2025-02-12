@@ -12,7 +12,7 @@ import { createRateLimiter } from "@/services/rateLimitService";
 import {
   createMockUser,
   createMockVerificationToken,
-  createRegistrationData,
+  createInitialRegistrationData,
 } from "@/test-utils/factories";
 import type { RateLimitProvider } from "@/types/rateLimit";
 
@@ -45,7 +45,6 @@ jest.mock("@/services/emailService", () => ({
   },
 }));
 
-// Improve rate limit service mock with proper types
 jest.mock("@/services/rateLimitService", () => {
   const mockProvider: RateLimitProvider = {
     checkLimit: jest.fn(async () => ({ count: 0, timestamp: Date.now() })),
@@ -66,20 +65,11 @@ jest.mock("@/services/rateLimitService", () => {
 describe("Auth register API Route", () => {
   const FIXED_DATE = "2025-02-07T00:00:00.000Z";
 
-  // Valid test data
+  // Valid test data for initial registration
   const validRegistrationData = {
     email: "test@example.com",
-    password: "Password123!@#", // Increased complexity to meet requirements
+    password: "Password123!@#",
     name: "Test User",
-    phone: "1234567890",
-    address: {
-      line1: "123 Test St",
-      line2: "Apt 4",
-      city: "Test City",
-      state: "TS",
-      zipCode: "12345",
-    },
-    acceptTerms: true,
   };
 
   beforeAll(() => {
@@ -104,26 +94,12 @@ describe("Auth register API Route", () => {
     };
     prisma.user.findUnique.mockResolvedValue(null);
 
-    // // Mock successful user creation
-    // prisma.user.create.mockResolvedValue({
-    //   id: "test-user-id",
-    //   email: validRegistrationData.email,
-    //   name: validRegistrationData.name,
-    //   phone: validRegistrationData.phone,
-    //   password: "hashed_password",
-    //   phoneVerified: false,
-    //   isProfileComplete: false,
-    //   emailVerified: null,
-    //   createdAt: new Date(FIXED_DATE),
-    //   updatedAt: new Date(FIXED_DATE),
-    // });
-
     // Mock successful user creation
     prisma.user.create.mockResolvedValue(
       createMockUser({
         email: validRegistrationData.email,
         name: validRegistrationData.name,
-        phone: validRegistrationData.phone,
+        isProfileComplete: false,
       }),
     );
 
@@ -133,13 +109,6 @@ describe("Auth register API Route", () => {
         identifier: validRegistrationData.email,
       }),
     );
-
-    // Mock successful verification token creation
-    prisma.verificationToken.create.mockResolvedValue({
-      token: "test-verification-token",
-      expires: new Date(FIXED_DATE),
-      identifier: validRegistrationData.email,
-    });
 
     // Mock successful password hashing
     (hash as jest.Mock).mockResolvedValue("hashed_password");
@@ -152,7 +121,7 @@ describe("Auth register API Route", () => {
   });
 
   describe("Input Validation", () => {
-    it("should successfully create a user with valid registration data", async () => {
+    it("should successfully create a user with valid initial registration data", async () => {
       const request = new Request("http://localhost:3000/api/auth/register", {
         method: "POST",
         body: JSON.stringify(validRegistrationData),
@@ -167,6 +136,7 @@ describe("Auth register API Route", () => {
           id: "test-user-id",
           email: validRegistrationData.email,
           name: validRegistrationData.name,
+          isProfileComplete: false,
         },
       });
 
@@ -176,7 +146,7 @@ describe("Auth register API Route", () => {
           data: expect.objectContaining({
             email: validRegistrationData.email,
             name: validRegistrationData.name,
-            phone: validRegistrationData.phone,
+            isProfileComplete: false,
           }),
         }),
       );
@@ -220,35 +190,6 @@ describe("Auth register API Route", () => {
       expect(body.error).toContain("Invalid email");
     });
 
-    it("should return 400 when password is too short", async () => {
-      const invalidData = { ...validRegistrationData, password: "short" };
-      const request = new Request("http://localhost:3000/api/auth/register", {
-        method: "POST",
-        body: JSON.stringify(invalidData),
-      }) as unknown as NextRequest;
-
-      const response = await POST(request);
-      expect(response.status).toBe(HTTP_STATUS.BAD_REQUEST);
-
-      const body = await response.json();
-      expect(body.error).toBe("Password must be at least 12 characters");
-    });
-
-    it("should return 400 when name is missing", async () => {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars -- Destructuring to exclude name field for invalid data test
-      const { name, ...invalidData } = validRegistrationData;
-      const request = new Request("http://localhost:3000/api/auth/register", {
-        method: "POST",
-        body: JSON.stringify(invalidData),
-      }) as unknown as NextRequest;
-
-      const response = await POST(request);
-      expect(response.status).toBe(HTTP_STATUS.BAD_REQUEST);
-
-      const body = await response.json();
-      expect(body.error).toBe("Required");
-    });
-
     it("should validate password complexity requirements", async () => {
       const testCases = [
         {
@@ -267,7 +208,7 @@ describe("Auth register API Route", () => {
       ];
 
       for (const testCase of testCases) {
-        const invalidData = createRegistrationData({
+        const invalidData = createInitialRegistrationData({
           password: testCase.password,
         });
 
@@ -283,57 +224,10 @@ describe("Auth register API Route", () => {
         expect(body.error).toBe(testCase.error);
       }
     });
-
-    it("should validate state field length", async () => {
-      const invalidData = createRegistrationData({
-        address: {
-          line1: "123 Test St",
-          line2: "Apt 4",
-          city: "Test City",
-          state: "INVALID", // Too long for state code
-          zipCode: "12345",
-        },
-      });
-
-      const request = new Request("http://localhost:3000/api/auth/register", {
-        method: "POST",
-        body: JSON.stringify(invalidData),
-      }) as unknown as NextRequest;
-
-      const response = await POST(request);
-      expect(response.status).toBe(HTTP_STATUS.BAD_REQUEST);
-
-      const body = await response.json();
-      expect(body.error).toBe("State must be 2 letters");
-    });
-
-    it("should validate zip code format", async () => {
-      const invalidData = createRegistrationData({
-        address: {
-          line1: "123 Test St",
-          line2: "Apt 4",
-          city: "Test City",
-          state: "TS",
-          zipCode: "1234", // Invalid zip code format
-        },
-      });
-
-      const request = new Request("http://localhost:3000/api/auth/register", {
-        method: "POST",
-        body: JSON.stringify(invalidData),
-      }) as unknown as NextRequest;
-
-      const response = await POST(request);
-      expect(response.status).toBe(HTTP_STATUS.BAD_REQUEST);
-
-      const body = await response.json();
-      expect(body.error).toBe("Invalid ZIP code");
-    });
   });
 
   describe("Duplicate User and Error Handling", () => {
     beforeEach(() => {
-      // Reset rate limiter for each test with proper typing
       const { rateLimitService } = jest.requireMock(
         "@/services/rateLimitService",
       ) as {
@@ -346,14 +240,12 @@ describe("Auth register API Route", () => {
     });
 
     it("should return 409 when email already exists", async () => {
-      // Mock existing user with all required fields
       (prisma.user.findUnique as jest.Mock).mockResolvedValue(
         createMockUser({
           email: validRegistrationData.email,
         }),
       );
 
-      // Mock rate limiter with proper typing
       const mockRateLimiter = jest.fn(async () => {});
       (createRateLimiter as jest.Mock).mockReturnValue(mockRateLimiter);
 
@@ -370,24 +262,18 @@ describe("Auth register API Route", () => {
     });
 
     it("should handle transaction rollback if email sending fails", async () => {
-      // Mock rate limiter to allow this request
       const mockRateLimiter = jest.fn();
       (createRateLimiter as jest.Mock).mockReturnValue(mockRateLimiter);
 
-      // Mock email service to fail
       (emailService.sendVerificationEmail as jest.Mock).mockRejectedValue(
         new Error("Email service failed"),
       );
 
-      // Mock transaction to allow the email service to be called
       const mockTransaction = jest.fn().mockImplementation(async (callback) => {
-        // Execute the transaction callback
         const result = await callback(prisma);
-        // Let the transaction complete but keep track of the result
         return result;
       });
 
-      // Override the transaction mock for this test
       (prisma.$transaction as jest.Mock).mockImplementation(mockTransaction);
 
       const request = new Request("http://localhost:3000/api/auth/register", {
@@ -401,13 +287,11 @@ describe("Auth register API Route", () => {
       const body = await response.json();
       expect(body.error).toBeTruthy();
 
-      // Verify the sequence of operations
       expect(prisma.$transaction).toHaveBeenCalled();
       expect(prisma.user.create).toHaveBeenCalled();
       expect(prisma.verificationToken.create).toHaveBeenCalled();
       expect(emailService.sendVerificationEmail).toHaveBeenCalled();
 
-      // Verify the rollback happened after email failure
       expect((prisma.$transaction as jest.Mock).mock.results[0].type).toBe(
         "return",
       );

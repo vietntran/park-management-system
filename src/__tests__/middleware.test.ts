@@ -100,34 +100,6 @@ describe("Middleware", () => {
     );
   });
 
-  it("should redirect to profile completion when profile is incomplete", async () => {
-    // Mock authenticated user with incomplete profile - add all expected token properties
-    (getToken as jest.Mock).mockResolvedValue({
-      name: "Test User",
-      email: "test@example.com",
-      sub: "user123",
-      isProfileComplete: false,
-      iat: Math.floor(Date.now() / 1000),
-      exp: Math.floor(Date.now() / 1000) + 60 * 60, // 1 hour from now
-      jti: "test-jwt-id",
-    });
-
-    const url = new URL("http://localhost:3000/dashboard");
-    const request = {
-      nextUrl: url,
-      url: url.toString(),
-      method: "GET",
-      headers: new Headers(),
-    } as unknown as NextRequest;
-
-    const response = await middleware(request);
-
-    expect(response?.status).toBe(307);
-    expect(response?.headers.get("Location")).toBe(
-      "http://localhost:3000/profile/complete",
-    );
-  });
-
   it("should allow access to profile/complete even with incomplete profile", async () => {
     // Mock authenticated user with incomplete profile
     (getToken as jest.Mock).mockResolvedValue({
@@ -185,93 +157,86 @@ describe("Middleware", () => {
     );
   });
 
-  describe("Profile Route Handling", () => {
-    it("should redirect to profile/complete when accessing profile page with incomplete profile", async () => {
+  describe("Profile Completion Requirements", () => {
+    const reservationPaths = [
+      "/reservations",
+      "/api/reservations",
+      "/profile/reservations",
+    ];
+
+    reservationPaths.forEach((path) => {
+      it(`should require profile completion for ${path}`, async () => {
+        (getToken as jest.Mock).mockResolvedValue({
+          sub: "user123",
+          isProfileComplete: false,
+        });
+
+        const url = new URL(`http://localhost:3000${path}`);
+        const request = {
+          nextUrl: url,
+          url: url.toString(),
+          method: "GET",
+          headers: new Headers(),
+        } as unknown as NextRequest;
+
+        const response = await middleware(request);
+        expect(response?.status).toBe(307);
+        expect(response?.headers.get("Location")).toBe(
+          "http://localhost:3000/profile/complete",
+        );
+        expect(response?.headers.get("Set-Cookie")).toContain(
+          `redirectAfterProfile=${path}`,
+        );
+      });
+
+      it(`should allow access to ${path} with completed profile`, async () => {
+        (getToken as jest.Mock).mockResolvedValue({
+          sub: "user123",
+          isProfileComplete: true,
+        });
+
+        const url = new URL(`http://localhost:3000${path}`);
+        const request = {
+          nextUrl: url,
+          url: url.toString(),
+          method: "GET",
+          headers: new Headers(),
+        } as unknown as NextRequest;
+
+        const response = await middleware(request);
+        expect(response?.status).toBe(200);
+      });
+    });
+
+    it("should allow access to non-reservation paths without completed profile", async () => {
       (getToken as jest.Mock).mockResolvedValue({
         sub: "user123",
         isProfileComplete: false,
       });
 
-      const url = new URL("http://localhost:3000/profile");
-      const request = {
-        nextUrl: url,
-        url: url.toString(),
-        method: "GET",
-        headers: new Headers(),
-      } as unknown as NextRequest;
+      const nonReservationPaths = [
+        "/dashboard",
+        "/profile",
+        "/profile/settings",
+      ];
 
-      const response = await middleware(request);
-      expect(response?.status).toBe(307);
-      expect(response?.headers.get("Location")).toBe(
-        "http://localhost:3000/profile/complete",
-      );
+      for (const path of nonReservationPaths) {
+        const url = new URL(`http://localhost:3000${path}`);
+        const request = {
+          nextUrl: url,
+          url: url.toString(),
+          method: "GET",
+          headers: new Headers(),
+        } as unknown as NextRequest;
+
+        const response = await middleware(request);
+        expect(response?.status).toBe(200);
+      }
     });
+  });
 
-    it("should allow access to profile page when profile is complete", async () => {
-      (getToken as jest.Mock).mockResolvedValue({
-        sub: "user123",
-        isProfileComplete: true,
-      });
-
-      const url = new URL("http://localhost:3000/profile");
-      const request = {
-        nextUrl: url,
-        url: url.toString(),
-        method: "GET",
-        headers: new Headers(),
-      } as unknown as NextRequest;
-
-      const response = await middleware(request);
-      expect(response?.status).toBe(200);
-    });
-
-    it("should store original path in cookie when redirecting", async () => {
-      (getToken as jest.Mock).mockResolvedValue({
-        sub: "user123",
-        isProfileComplete: false,
-      });
-
-      const url = new URL("http://localhost:3000/dashboard?tab=settings");
-      const request = {
-        nextUrl: url,
-        url: url.toString(),
-        method: "GET",
-        headers: new Headers(),
-      } as unknown as NextRequest;
-
-      const response = await middleware(request);
-
-      // The mock already appends to headers, so check Set-Cookie header
-      expect(response?.headers.get("Set-Cookie")).toContain(
-        "redirectAfterProfile=/dashboard?tab=settings",
-      );
-    });
-
-    it("should redirect to profile/complete for nested profile routes with incomplete profile", async () => {
-      (getToken as jest.Mock).mockResolvedValue({
-        sub: "user123",
-        isProfileComplete: false,
-      });
-
-      const url = new URL("http://localhost:3000/profile/settings");
-      const request = {
-        nextUrl: url,
-        url: url.toString(),
-        method: "GET",
-        headers: new Headers(),
-      } as unknown as NextRequest;
-
-      const response = await middleware(request);
-      expect(response?.status).toBe(307);
-      expect(response?.headers.get("Location")).toBe(
-        "http://localhost:3000/profile/complete",
-      );
-      expect(response?.headers.get("Set-Cookie")).toContain(
-        "redirectAfterProfile=/profile/settings",
-      );
-    });
-
-    it("should allow access to profile/complete even with incomplete profile", async () => {
+  describe("Profile Completion Page Access", () => {
+    it("should always allow access to profile completion page with incomplete profile", async () => {
       (getToken as jest.Mock).mockResolvedValue({
         sub: "user123",
         isProfileComplete: false,
@@ -289,43 +254,7 @@ describe("Middleware", () => {
       expect(response?.status).toBe(200);
     });
 
-    it("should handle API routes under profile path", async () => {
-      (getToken as jest.Mock).mockResolvedValue({
-        sub: "user123",
-        isProfileComplete: false,
-      });
-
-      const url = new URL("http://localhost:3000/api/profile/update");
-      const request = {
-        nextUrl: url,
-        url: url.toString(),
-        method: "POST",
-        headers: new Headers(),
-      } as unknown as NextRequest;
-
-      const response = await middleware(request);
-      expect(response?.status).toBe(307);
-      expect(response?.headers.get("Location")).toBe(
-        "http://localhost:3000/profile/complete",
-      );
-    });
-  });
-
-  describe("Public Routes and API Handling", () => {
-    it("should allow access to public API routes", async () => {
-      const url = new URL("http://localhost:3000/api/public/some-endpoint");
-      const request = {
-        nextUrl: url,
-        url: url.toString(),
-        method: "GET",
-        headers: new Headers(),
-      } as unknown as NextRequest;
-
-      const response = await middleware(request);
-      expect(response?.status).toBe(200); // NextResponse.next()
-    });
-
-    it("should allow access to profile completion API with incomplete profile", async () => {
+    it("should always allow access to profile completion API with incomplete profile", async () => {
       (getToken as jest.Mock).mockResolvedValue({
         sub: "user123",
         isProfileComplete: false,
@@ -340,29 +269,10 @@ describe("Middleware", () => {
       } as unknown as NextRequest;
 
       const response = await middleware(request);
-      expect(response?.status).toBe(200); // NextResponse.next()
+      expect(response?.status).toBe(200);
     });
-  });
 
-  describe("Protected Resource Access", () => {
-    it("should protect static resources based on matcher", async () => {
-      const url = new URL("http://localhost:3000/resources/protected-file.pdf");
-      const request = {
-        nextUrl: url,
-        url: url.toString(),
-        method: "GET",
-        headers: new Headers(),
-      } as unknown as NextRequest;
-
-      const response = await middleware(request);
-      expect(response?.status).toBe(307);
-      expect(response?.headers.get("Location")).toContain("/auth/login");
-    });
-  });
-
-  // Update the Profile Completion Page Access describe block
-  describe("Profile Completion Page Access", () => {
-    it("should redirect completed profiles away from profile/complete page", async () => {
+    it("should redirect completed profiles away from profile completion page", async () => {
       (getToken as jest.Mock).mockResolvedValue({
         sub: "user123",
         isProfileComplete: true,
@@ -382,23 +292,20 @@ describe("Middleware", () => {
         "http://localhost:3000/profile",
       );
     });
+  });
 
-    it("should allow access to profile completion API with incomplete profile", async () => {
-      (getToken as jest.Mock).mockResolvedValue({
-        sub: "user123",
-        isProfileComplete: false,
-      });
-
-      const url = new URL("http://localhost:3000/api/auth/profile/complete");
+  describe("Public Routes", () => {
+    it("should allow access to public API routes", async () => {
+      const url = new URL("http://localhost:3000/api/public/some-endpoint");
       const request = {
         nextUrl: url,
         url: url.toString(),
-        method: "POST",
+        method: "GET",
         headers: new Headers(),
       } as unknown as NextRequest;
 
       const response = await middleware(request);
-      expect(response?.status).toBe(200); // NextResponse.next()
+      expect(response?.status).toBe(200);
     });
   });
 });

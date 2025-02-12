@@ -5,9 +5,16 @@ import { getToken } from "next-auth/jwt";
 import edgeLogger from "@/lib/edge-logger";
 import type { LogContext } from "@/lib/logger";
 
+// Define protected paths that require profile completion
+const PATHS_REQUIRING_PROFILE = [
+  "/reservations",
+  "/api/reservations",
+  "/profile/reservations",
+];
+
 export async function middleware(request: NextRequest) {
   try {
-    // Skip auth check for public API routes if needed
+    // Skip auth check for public API routes
     if (request.nextUrl.pathname.startsWith("/api/public")) {
       return NextResponse.next();
     }
@@ -30,9 +37,14 @@ export async function middleware(request: NextRequest) {
 
     logContext.userId = token.sub;
 
+    // Check if the current path requires a complete profile
+    const requiresCompleteProfile = PATHS_REQUIRING_PROFILE.some((path) =>
+      request.nextUrl.pathname.startsWith(path),
+    );
+
     // Handle profile completion status
-    if (!token.isProfileComplete) {
-      // Allow access to profile/complete and its API
+    if (!token.isProfileComplete && requiresCompleteProfile) {
+      // Allow access to profile completion page and its API
       if (
         request.nextUrl.pathname === "/profile/complete" ||
         request.nextUrl.pathname === "/api/auth/profile/complete"
@@ -40,7 +52,7 @@ export async function middleware(request: NextRequest) {
         return NextResponse.next();
       }
 
-      edgeLogger.info("Incomplete profile access attempt", {
+      edgeLogger.info("Incomplete profile accessing protected route", {
         ...logContext,
         redirectTo: "/profile/complete",
       });
@@ -50,14 +62,14 @@ export async function middleware(request: NextRequest) {
         new URL("/profile/complete", request.url),
       );
 
-      // Store original path including search params
+      // Store original path including search params for redirect after completion
       const returnPath = request.nextUrl.pathname + request.nextUrl.search;
       response.cookies.set("redirectAfterProfile", returnPath);
 
       return response;
     }
 
-    // Redirect completed profiles away from profile/complete page
+    // Redirect completed profiles away from profile completion page
     if (
       token.isProfileComplete &&
       request.nextUrl.pathname === "/profile/complete"

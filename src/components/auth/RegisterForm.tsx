@@ -1,33 +1,24 @@
+"use client";
+
 import { Eye, EyeOff } from "lucide-react";
 import { useRouter } from "next/navigation";
 import React, { useState } from "react";
 
-import { RegistrationResponse } from "@/app/api/auth/register/route";
-import AddressForm from "@/components/forms/AddressForm";
 import { typedFetch } from "@/lib/utils";
-import { registerSchema } from "@/lib/validations/auth";
-import type { Address, PartialAddress } from "@/types/address";
-import { type RegisterFormData } from "@/types/auth";
-
-type FormData = Omit<RegisterFormData, "address"> & {
-  address?: PartialAddress;
-};
+import { initialRegistrationSchema } from "@/lib/validations/auth";
+import type {
+  InitialRegistrationData,
+  RegistrationResponse,
+} from "@/types/auth";
 
 export default function RegisterForm() {
   const router = useRouter();
   const [error, setError] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [showAddress, setShowAddress] = useState(false);
-  const [formData, setFormData] = useState<Partial<FormData>>({
-    address: {
-      line1: "",
-      line2: "",
-      city: "",
-      state: "",
-      zipCode: "",
-    },
-  });
+  const [formData, setFormData] = useState<Partial<InitialRegistrationData>>(
+    {},
+  );
   const [attempts, setAttempts] = useState(0);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -43,18 +34,7 @@ export default function RegisterForm() {
       return;
     }
 
-    // Clean up address data before submission
-    const submissionData = {
-      ...formData,
-      address:
-        showAddress &&
-        formData.address &&
-        Object.values(formData.address).some(Boolean)
-          ? formData.address
-          : undefined,
-    };
-
-    const result = registerSchema.safeParse(submissionData);
+    const result = initialRegistrationSchema.safeParse(formData);
 
     if (!result.success) {
       setError(result.error.errors[0]?.message || "Invalid form data");
@@ -96,23 +76,17 @@ export default function RegisterForm() {
     }));
   };
 
-  const handleAddressChange = (field: keyof Address, value: string) => {
-    setFormData((prev) => {
-      const updatedAddress: PartialAddress = {
-        ...(prev.address || {}),
-        [field]: value,
-      };
-
-      return {
-        ...prev,
-        address: updatedAddress,
-      };
-    });
-  };
-
   return (
     <div className="max-w-md mx-auto mt-8 p-6 bg-white rounded-lg shadow-md">
-      <h2 className="text-2xl font-bold mb-6 text-center">Register</h2>
+      <h2 className="text-2xl font-bold mb-6 text-center">Create Account</h2>
+      <div className="mb-6 text-center">
+        <span className="inline-flex items-center rounded-full bg-blue-100 px-3 py-1 text-sm font-medium text-blue-800">
+          Step 1 of 2: Basic Registration
+        </span>
+        <p className="mt-2 text-sm text-gray-600">
+          Next step: Complete your profile to enable reservations
+        </p>
+      </div>
       {error && (
         <div className="mb-4 p-3 bg-red-100 text-red-700 rounded" role="alert">
           {error}
@@ -154,29 +128,6 @@ export default function RegisterForm() {
             className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
             aria-required="true"
           />
-        </div>
-        <div>
-          <label
-            htmlFor="phone"
-            className="block text-sm font-medium text-gray-700"
-          >
-            Phone Number{" "}
-            <span className="text-gray-500 text-sm">(Optional)</span>
-          </label>
-          <input
-            type="tel"
-            id="phone"
-            name="phone"
-            value={formData.phone ?? ""}
-            onChange={handleChange}
-            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-            placeholder="1234567890"
-            aria-required="false"
-          />
-          <p className="mt-1 text-sm text-gray-500">
-            Providing a phone number helps us contact you about your
-            reservations and any park-related emergencies
-          </p>
         </div>
         <div>
           <label
@@ -222,55 +173,13 @@ export default function RegisterForm() {
           </div>
         </div>
 
-        <div className="border-t pt-4">
-          <div className="flex items-center justify-between mb-4">
-            <span className="text-sm font-medium text-gray-700">
-              Address (Optional)
-            </span>
-            <button
-              type="button"
-              onClick={() => setShowAddress(!showAddress)}
-              className="text-sm text-blue-600 hover:text-blue-500"
-            >
-              {showAddress ? "Hide Address" : "Add Address"}
-            </button>
-          </div>
-
-          {showAddress && (
-            <AddressForm
-              address={formData.address ?? null}
-              onChange={handleAddressChange}
-            />
-          )}
-        </div>
-
-        <div>
-          <label className="flex items-center">
-            <input
-              type="checkbox"
-              name="acceptTerms"
-              onChange={(e) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  acceptTerms: e.target.checked,
-                }))
-              }
-              className="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
-              required
-            />
-            <span className="ml-2 text-sm text-gray-600">
-              I accept the terms and conditions
-            </span>
-          </label>
-        </div>
-
         <button
           type="submit"
           disabled={loading}
           className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
           aria-disabled={loading}
         >
-          {loading ? "Registering..." : "Register"}
+          {loading ? "Creating account..." : "Create account"}
         </button>
       </form>
     </div>

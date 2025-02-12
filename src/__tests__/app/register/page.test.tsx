@@ -6,7 +6,7 @@ import { act } from "react";
 
 import RegisterPage from "@/app/register/page";
 import { typedFetch } from "@/lib/utils";
-import { createRegistrationData } from "@/test-utils/factories";
+import { createInitialRegistrationData } from "@/test-utils/factories";
 import type { RegistrationResponse } from "@/types/auth";
 
 // Mocks
@@ -50,23 +50,34 @@ describe("RegisterPage", () => {
     });
   });
 
-  it("renders registration form with all required fields", () => {
+  it("renders registration form with all required fields and step indicator", () => {
     render(<RegisterPage />);
 
+    // Check for step indicator
+    expect(screen.getByText(/Step 1 of 2/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Next step: Complete your profile/i),
+    ).toBeInTheDocument();
+
+    // Check form fields
     expect(screen.getByRole("textbox", { name: /Name/i })).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: /Email/i })).toBeInTheDocument();
-    expect(
-      screen.getByRole("textbox", { name: /Phone Number/i }),
-    ).toBeInTheDocument();
     expect(screen.getByLabelText(/Password/i)).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /Create account/i }),
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Google/i })).toBeInTheDocument();
+
+    // Password requirements
+    expect(
+      screen.getByText(
+        /Must be at least 12 characters.*uppercase.*lowercase.*number.*special character/i,
+      ),
+    ).toBeInTheDocument();
   });
 
   it("handles successful registration and sign in", async () => {
-    const registrationData = createRegistrationData();
+    const registrationData = createInitialRegistrationData();
     const mockResponse: RegistrationResponse = {
       success: true,
       data: {
@@ -74,6 +85,7 @@ describe("RegisterPage", () => {
           id: "123",
           email: registrationData.email,
           name: registrationData.name,
+          isProfileComplete: false,
         },
       },
     };
@@ -92,10 +104,6 @@ describe("RegisterPage", () => {
       await user.type(
         screen.getByRole("textbox", { name: /Email address/i }),
         registrationData.email,
-      );
-      await user.type(
-        screen.getByRole("textbox", { name: /Phone Number/i }),
-        registrationData.phone,
       );
       await user.type(
         screen.getByLabelText(/Password/i),
@@ -126,7 +134,6 @@ describe("RegisterPage", () => {
     expect(parsedBody).toEqual({
       name: registrationData.name,
       email: registrationData.email,
-      phone: registrationData.phone,
       password: registrationData.password,
     });
 
@@ -141,7 +148,7 @@ describe("RegisterPage", () => {
   });
 
   it("handles registration API error", async () => {
-    const registrationData = createRegistrationData();
+    const registrationData = createInitialRegistrationData();
     const errorMessage = "Email already exists";
 
     mockTypedFetch.mockRejectedValueOnce(new Error(errorMessage));
@@ -156,10 +163,6 @@ describe("RegisterPage", () => {
       await user.type(
         screen.getByRole("textbox", { name: /Email/i }),
         registrationData.email,
-      );
-      await user.type(
-        screen.getByRole("textbox", { name: /Phone Number/i }),
-        registrationData.phone,
       );
       await user.type(
         screen.getByLabelText(/Password/i),
@@ -178,7 +181,7 @@ describe("RegisterPage", () => {
   });
 
   it("handles successful registration but failed sign in", async () => {
-    const registrationData = createRegistrationData();
+    const registrationData = createInitialRegistrationData();
     const mockResponse: RegistrationResponse = {
       success: true,
       data: {
@@ -186,6 +189,7 @@ describe("RegisterPage", () => {
           id: "123",
           email: registrationData.email,
           name: registrationData.name,
+          isProfileComplete: false,
         },
       },
     };
@@ -205,10 +209,6 @@ describe("RegisterPage", () => {
       await user.type(
         screen.getByRole("textbox", { name: /Email/i }),
         registrationData.email,
-      );
-      await user.type(
-        screen.getByRole("textbox", { name: /Phone Number/i }),
-        registrationData.phone,
       );
       await user.type(
         screen.getByLabelText(/Password/i),
@@ -237,44 +237,5 @@ describe("RegisterPage", () => {
     expect(signIn).toHaveBeenCalledWith("google", {
       callbackUrl: "/dashboard",
     });
-  });
-
-  it("validates phone number format", async () => {
-    const registrationData = createRegistrationData({
-      phone: "invalid",
-    });
-
-    render(<RegisterPage />);
-
-    await act(async () => {
-      await user.type(
-        screen.getByRole("textbox", { name: /Name/i }),
-        registrationData.name,
-      );
-      await user.type(
-        screen.getByRole("textbox", { name: /Email/i }),
-        registrationData.email,
-      );
-      await user.type(
-        screen.getByRole("textbox", { name: /Phone Number/i }),
-        registrationData.phone,
-      );
-      await user.type(
-        screen.getByLabelText(/Password/i),
-        registrationData.password,
-      );
-    });
-
-    await act(async () => {
-      await user.click(screen.getByRole("button", { name: /Create account/i }));
-    });
-
-    await waitFor(() => {
-      expect(
-        screen.getByText("Phone number must be exactly 10 digits"),
-      ).toBeInTheDocument();
-    });
-
-    expect(mockTypedFetch).not.toHaveBeenCalled();
   });
 });
