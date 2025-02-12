@@ -53,7 +53,10 @@ export const registerSchema = z.object({
       /^[a-zA-Z\s-']+$/,
       "Name can only contain letters, spaces, hyphens, and apostrophes",
     ),
-  phone: z.string().regex(/^\d{10}$/, "Phone number must be exactly 10 digits"),
+  phone: z
+    .string()
+    .regex(/^\d{10}$/, "Phone number must be exactly 10 digits")
+    .optional(),
   address: addressSchema.optional(),
   acceptTerms: z.boolean().refine((val) => val === true, {
     message: "You must accept the terms and conditions",
@@ -77,3 +80,12 @@ export const profileUpdateSchema = registerSchema.partial().omit({
   password: true,
   acceptTerms: true,
 });
+
+export const phoneSchema = z
+  .string()
+  .regex(/^\+?[1-9]\d{1,14}$/, {
+    message:
+      "If provided, phone number must be in international format (e.g., +1234567890)",
+  })
+  .optional()
+  .or(z.literal("")); // Allow empty string for form handling

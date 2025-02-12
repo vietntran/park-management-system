@@ -160,7 +160,8 @@ export default function RegisterForm() {
             htmlFor="phone"
             className="block text-sm font-medium text-gray-700"
           >
-            Phone
+            Phone Number{" "}
+            <span className="text-gray-500 text-sm">(Optional)</span>
           </label>
           <input
             type="tel"
@@ -168,12 +169,14 @@ export default function RegisterForm() {
             name="phone"
             value={formData.phone ?? ""}
             onChange={handleChange}
-            required
-            pattern="[0-9]{10}"
             className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
             placeholder="1234567890"
-            aria-required="true"
+            aria-required="false"
           />
+          <p className="mt-1 text-sm text-gray-500">
+            Providing a phone number helps us contact you about your
+            reservations and any park-related emergencies
+          </p>
         </div>
         <div>
           <label
