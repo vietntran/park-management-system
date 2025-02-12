@@ -84,16 +84,18 @@ export async function middleware(request: NextRequest) {
   }
 }
 
+// MATCHER STRATEGY:
+// We use explicit path matching instead of exclusion patterns because:
+// - It's more explicit about what routes are protected
+// - Easier to maintain and audit security
+// - Less prone to accidentally protecting/exposing wrong routes
+// - New routes must be consciously added to be protected
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - auth (authentication routes)
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public folder
-     */
-    "/((?!auth|_next/static|_next/image|favicon.ico|public).*)",
+    "/dashboard/:path*",
+    "/api/reservations/:path*",
+    "/reservations/:path*",
+    "/profile/:path*",
+    "/api/auth/profile/complete",
   ],
 };
