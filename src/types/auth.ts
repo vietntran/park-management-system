@@ -25,3 +25,16 @@ export interface AuthErrorStates {
   verifyingEmailTokenError: string | null;
   sendingVerificationEmailError: string | null;
 }
+
+// Registration specific types
+export interface RegisteredUser {
+  id: string;
+  email: string;
+  name: string;
+}
+
+export interface RegistrationSuccess {
+  user: RegisteredUser;
+}
+
+export type RegistrationResponse = ApiResponse<RegistrationSuccess>;

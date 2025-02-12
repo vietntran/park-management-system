@@ -58,9 +58,6 @@ export const registerSchema = z.object({
     .regex(/^\d{10}$/, "Phone number must be exactly 10 digits")
     .optional(),
   address: addressSchema.optional(),
-  acceptTerms: z.boolean().refine((val) => val === true, {
-    message: "You must accept the terms and conditions",
-  }),
 });
 
 export const emailVerificationSchema = z.object({
@@ -78,7 +75,6 @@ export const newPasswordSchema = z.object({
 
 export const profileUpdateSchema = registerSchema.partial().omit({
   password: true,
-  acceptTerms: true,
 });
 
 export const phoneSchema = z

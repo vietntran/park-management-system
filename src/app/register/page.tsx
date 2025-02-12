@@ -1,15 +1,17 @@
-// src/app/register/page.tsx
 "use client";
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
-import { useState } from "react";
+import { useCallback, useState } from "react"; // Add useCallback import
 
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/form/Button";
 import { FormContainer } from "@/components/ui/form/FormContainer";
 import { TextField } from "@/components/ui/form/TextField";
+import { typedFetch } from "@/lib/utils";
+import { registerSchema } from "@/lib/validations/auth";
+import type { RegisterFormData, RegistrationResponse } from "@/types/auth";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -18,58 +20,81 @@ export default function RegisterPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
+  const handleSubmit = useCallback(
+    async (e: React.FormEvent<HTMLFormElement>) => {
+      e.preventDefault();
+      setLoading(true);
+      setError(null);
 
-    const formData = new FormData(e.currentTarget);
-    const name = formData.get("name") as string;
-    const email = formData.get("email") as string;
-    const phone = formData.get("phone") as string;
-    const password = formData.get("password") as string;
+      const formElement = e.currentTarget;
+      const formData = new FormData(formElement);
 
-    try {
-      const response = await fetch("/api/auth/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password, phone }),
-      });
+      const formValues = {
+        name: formData.get("name"),
+        email: formData.get("email"),
+        phone: formData.get("phone"),
+        password: formData.get("password"),
+      };
 
-      const data = await response.json();
+      // Validate form data using Zod schema
+      const result = registerSchema.safeParse(formValues);
 
-      if (!response.ok) {
-        throw new Error(data.message || "Failed to register");
-      }
-
-      // Sign in the user after successful registration
-      const result = await signIn("credentials", {
-        redirect: false,
-        email,
-        password,
-      });
-
-      if (result?.error) {
-        setError(
-          "Registration successful but failed to log in. Please try logging in.",
-        );
-        router.push("/login");
+      if (!result.success) {
+        setError(result.error.errors[0].message);
+        setLoading(false);
         return;
       }
 
-      router.push(from);
-    } catch (error) {
-      setError(
-        error instanceof Error ? error.message : "An unexpected error occurred",
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
+      const registrationData: RegisterFormData = result.data;
 
-  const handleGoogleSignIn = () => {
+      try {
+        const response = await typedFetch<RegistrationResponse>(
+          "/api/auth/register",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(registrationData),
+          },
+        );
+
+        if (!response.success) {
+          throw new Error(response.error);
+        }
+
+        // Sign in the user after successful registration
+        const signInResult = await signIn("credentials", {
+          redirect: false,
+          email: registrationData.email,
+          password: registrationData.password,
+        });
+
+        if (signInResult?.error) {
+          setError(
+            "Registration successful but failed to log in. Please try logging in.",
+          );
+          router.push("/login");
+          return;
+        }
+
+        router.push(from);
+      } catch (error) {
+        setError(
+          error instanceof Error
+            ? error.message
+            : "An unexpected error occurred",
+        );
+      } finally {
+        setLoading(false);
+      }
+    },
+    [router, from],
+  ); // Add dependencies
+
+  const handleGoogleSignIn = useCallback(() => {
     signIn("google", { callbackUrl: from });
-  };
+  }, [from]); // Add dependency
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12 sm:px-6 lg:px-8">
