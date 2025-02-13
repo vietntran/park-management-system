@@ -1,76 +1,93 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { User, Address } from "@prisma/client";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 
 import { Alert, AlertDescription } from "@/components/ui/Alert";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { Button } from "@/components/ui/button";
-import { FormContainer } from "@/components/ui/form/FormContainer";
+import { Card, CardContent } from "@/components/ui/card";
 import { TextField } from "@/components/ui/form/TextField";
 import {
   profileUpdateSchema,
   type ProfileUpdateData,
 } from "@/lib/validations/forms";
 
-export default function ProfileCompletionPage() {
-  const router = useRouter();
-  const { update: updateSession } = useSession();
+type ProfileFormProps = {
+  user: User & { address: Address | null };
+  onSubmit?: (data: ProfileUpdateData) => Promise<void>;
+};
+
+export function ProfileForm({ user, onSubmit }: ProfileFormProps) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
 
   const {
     register,
     handleSubmit,
-    formState: { errors, isSubmitting },
+    formState: { errors },
   } = useForm<ProfileUpdateData>({
     resolver: zodResolver(profileUpdateSchema),
+    defaultValues: {
+      name: user.name,
+      phone: user.phone || "",
+      address: {
+        line1: user.address?.line1 || "",
+        line2: user.address?.line2 || "",
+        city: user.address?.city || "",
+        state: user.address?.state || "",
+        zipCode: user.address?.zipCode || "",
+      },
+    },
   });
 
-  const onSubmit = async (data: ProfileUpdateData) => {
+  const handleFormSubmit = async (data: ProfileUpdateData) => {
     try {
+      setIsSubmitting(true);
       setError(null);
+      setSuccess(false);
 
-      const response = await fetch("/api/auth/profile/complete", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(data),
-      });
+      if (onSubmit) {
+        await onSubmit(data);
+      } else {
+        const response = await fetch("/api/profile", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data),
+        });
 
-      if (!response.ok) {
-        throw new Error("Failed to update profile");
+        if (!response.ok) {
+          throw new Error("Failed to update profile");
+        }
       }
 
-      // Update session to reflect the changes
-      await updateSession();
-
-      // Check for redirect cookie (set by middleware)
-      const redirectPath = document.cookie
-        .split("; ")
-        .find((row) => row.startsWith("redirectAfterProfile="))
-        ?.split("=")[1];
-
-      // Redirect to stored path or dashboard
-      router.push(
-        redirectPath
-          ? decodeURIComponent(redirectPath)
-          : "/dashboard?welcome=true",
-      );
+      setSuccess(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update profile");
+      setError(err instanceof Error ? err.message : "An error occurred");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12 sm:px-6 lg:px-8">
-      <FormContainer
-        title="Complete Your Profile"
-        subtitle="Please provide your contact information to continue"
-      >
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit(onSubmit)}>
+    <Card>
+      <CardContent className="pt-6">
+        <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
+          {error && (
+            <Alert variant="error">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+
+          {success && (
+            <Alert>
+              <AlertDescription>Profile updated successfully!</AlertDescription>
+            </Alert>
+          )}
+
           <TextField
             label="Full Name"
             {...register("name")}
@@ -81,7 +98,7 @@ export default function ProfileCompletionPage() {
             label="Phone Number"
             {...register("phone")}
             error={errors.phone?.message}
-            description="Required for reservation confirmations and park notifications"
+            description="Providing a phone number helps us contact you about your reservations and any park-related emergencies"
             placeholder="1234567890"
           />
 
@@ -125,17 +142,18 @@ export default function ProfileCompletionPage() {
             />
           </div>
 
-          {error && (
-            <Alert variant="error">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-
           <Button type="submit" className="w-full" disabled={isSubmitting}>
-            {isSubmitting ? "Completing..." : "Complete Profile"}
+            {isSubmitting ? (
+              <>
+                <LoadingSpinner className="mr-2" />
+                Updating...
+              </>
+            ) : (
+              "Update Profile"
+            )}
           </Button>
         </form>
-      </FormContainer>
-    </div>
+      </CardContent>
+    </Card>
   );
 }

@@ -4,6 +4,7 @@ interface TextFieldProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label: string;
   error?: string;
   description?: string;
+  optional?: boolean;
   className?: string;
 }
 
@@ -11,6 +12,7 @@ export function TextField({
   label,
   error,
   description,
+  optional,
   className = "",
   ...props
 }: TextFieldProps) {
@@ -18,8 +20,9 @@ export function TextField({
 
   return (
     <div className="space-y-2">
-      <label htmlFor={id} className="block text-sm font-medium text-gray-700 ">
+      <label htmlFor={id} className="block text-sm font-medium text-gray-700">
         {label}
+        {optional && <span className="text-gray-400 ml-1">(Optional)</span>}
       </label>
       <input
         id={id}
