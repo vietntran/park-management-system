@@ -1,4 +1,8 @@
-import type { ReservationStatus, ReservationUserStatus } from "@prisma/client";
+import type {
+  ReservationStatus,
+  ReservationUserStatus,
+  TransferStatus,
+} from "@prisma/client";
 
 import type { ApiResponse } from "./api";
 
@@ -86,4 +90,41 @@ export interface ErrorStates {
   userReservationsError: string | null;
   validationError: string | null;
   submissionError: string | null;
+}
+
+// src/types/reservation.ts
+
+// Add these to the existing types file
+export interface Transfer {
+  id: string;
+  reservationId: string;
+  fromUserId: string;
+  toUserId: string;
+  expiresAt: Date;
+  isPrimaryTransfer: boolean;
+  requestedAt: Date;
+  respondedAt: Date | null;
+  spotsToTransfer: string[];
+  status: TransferStatus;
+  fromUser?: {
+    id: string;
+    name: string;
+    email: string;
+  };
+  toUser?: {
+    id: string;
+    name: string;
+    email: string;
+  };
+  reservation?: Reservation;
+}
+
+export type TransferResponse = ApiResponse<Transfer>;
+export type TransferListResponse = ApiResponse<Transfer[]>;
+
+export interface TransferFormData {
+  reservationId: string;
+  toUserId: string;
+  spotsToTransfer: string[];
+  isPrimaryTransfer: boolean;
 }
