@@ -1,14 +1,12 @@
-// This is your Prisma schema file,
+generator client {
+  provider = "prisma-client-js"
+}
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-generator client {
-  provider = "prisma-client-js"
-}
-
-// NextAuth.js required models
 model Account {
   id                String  @id @default(cuid())
   userId            String  @map("user_id")
@@ -22,8 +20,7 @@ model Account {
   scope             String?
   id_token          String?
   session_state     String?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
   @@map("accounts")
@@ -48,30 +45,23 @@ model VerificationToken {
   @@map("verification_tokens")
 }
 
-// Existing models with NextAuth.js integration
 model User {
-  id              String    @id @default(uuid())
-  password        String?
-  email           String    @unique
-  phone           String?
-  name            String
-  emailVerified   DateTime? @map("email_verified")
-  phoneVerified   Boolean   @default(false) @map("phone_verified")
-  createdAt       DateTime  @default(now()) @map("created_at")
-  isProfileComplete Boolean  @default(false) @map("is_profile_complete")
-
-  // Address relation
-  address         Address?
-
-  // NextAuth.js relations
-  accounts        Account[]
-  sessions        Session[]
-
-  // Existing relations
-  primaryReservations    Reservation[]
-  reservationUsers       ReservationUser[]
-  transfersFrom         ReservationTransfer[] @relation("FromUser")
-  transfersTo           ReservationTransfer[] @relation("ToUser")
+  id                  String                @id @default(uuid())
+  email               String                @unique
+  phone               String?
+  name                String
+  phoneVerified       Boolean               @default(false) @map("phone_verified")
+  createdAt           DateTime              @default(now()) @map("created_at")
+  password            String?
+  isProfileComplete   Boolean               @default(false) @map("is_profile_complete")
+  emailVerified       DateTime?             @map("email_verified")
+  accounts            Account[]
+  address             Address?
+  transfersFrom       ReservationTransfer[] @relation("FromUser")
+  transfersTo         ReservationTransfer[] @relation("ToUser")
+  reservationUsers    ReservationUser[]
+  primaryReservations Reservation[]
+  sessions            Session[]
 
   @@map("users")
 }
@@ -86,45 +76,67 @@ model Address {
   zipCode   String   @map("zip_code")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
-
-  // Relation to User
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("addresses")
 }
 
 model Reservation {
-  id              String            @id @default(uuid())
-  primaryUserId   String            @map("primary_user_id")
-  reservationDate DateTime          @map("reservation_date")
-  createdAt       DateTime          @default(now()) @map("created_at")
-  status          ReservationStatus @default(ACTIVE)
-  canTransfer     Boolean           @default(true) @map("can_transfer")
-
-  // Relations
-  primaryUser     User                    @relation(fields: [primaryUserId], references: [id])
+  id               String                @id @default(uuid())
+  primaryUserId    String                @map("primary_user_id")
+  reservationDate  DateTime              @map("reservation_date")
+  createdAt        DateTime              @default(now()) @map("created_at")
+  canTransfer      Boolean               @default(true) @map("can_transfer")
+  status           ReservationStatus     @default(ACTIVE)
+  transfers        ReservationTransfer[]
   reservationUsers ReservationUser[]
-  transfers       ReservationTransfer[]
-  dateCapacity    DateCapacity            @relation(fields: [reservationDate], references: [date])
+  primaryUser      User                  @relation(fields: [primaryUserId], references: [id])
+  dateCapacity     DateCapacity          @relation(fields: [reservationDate], references: [date])
 
   @@index([primaryUserId, reservationDate])
   @@map("reservations")
 }
 
 model ReservationUser {
-  reservationId String   @map("reservation_id")
-  userId        String   @map("user_id")
-  isPrimary     Boolean  @default(false) @map("is_primary")
-  status        ReservationUserStatus @default(ACTIVE)  // Add this to track individual statuses
-  addedAt       DateTime @default(now()) @map("added_at")
-  cancelledAt   DateTime? @map("cancelled_at")
-
-  // Relations
-  reservation    Reservation @relation(fields: [reservationId], references: [id])
-  user          User        @relation(fields: [userId], references: [id])
+  reservationId String                @map("reservation_id")
+  userId        String                @map("user_id")
+  isPrimary     Boolean               @default(false) @map("is_primary")
+  addedAt       DateTime              @default(now()) @map("added_at")
+  cancelledAt   DateTime?             @map("cancelled_at")
+  status        ReservationUserStatus @default(ACTIVE)
+  reservation   Reservation           @relation(fields: [reservationId], references: [id])
+  user          User                  @relation(fields: [userId], references: [id])
 
   @@id([reservationId, userId])
   @@map("reservation_users")
+}
+
+model ReservationTransfer {
+  id                String         @id @default(uuid())
+  reservationId     String         @map("reservation_id")
+  fromUserId        String         @map("from_user_id")
+  toUserId          String         @map("to_user_id")
+  expiresAt         DateTime       @map("expires_at")
+  isPrimaryTransfer Boolean        @default(false) @map("is_primary_transfer")
+  requestedAt       DateTime       @default(now()) @map("requested_at")
+  respondedAt       DateTime?      @map("responded_at")
+  spotsToTransfer   String[]       @map("spots_to_transfer")
+  status            TransferStatus @default(PENDING)
+  fromUser          User           @relation("FromUser", fields: [fromUserId], references: [id])
+  reservation       Reservation    @relation(fields: [reservationId], references: [id])
+  toUser            User           @relation("ToUser", fields: [toUserId], references: [id])
+
+  @@unique([reservationId, status])
+  @@map("reservation_transfers")
+}
+
+model DateCapacity {
+  date          DateTime      @id
+  totalBookings Int           @default(0)
+  maxCapacity   Int           @default(60)
+  reservations  Reservation[]
+
+  @@map("date_capacities")
 }
 
 enum ReservationStatus {
@@ -137,30 +149,10 @@ enum ReservationUserStatus {
   CANCELLED
 }
 
-model ReservationTransfer {
-  id             String   @id @default(uuid())
-  reservationId  String   @map("reservation_id")
-  fromUserId     String   @map("from_user_id")
-  toUserId       String   @map("to_user_id")
-  transferredAt  DateTime @default(now()) @map("transferred_at")
-  transferReason String   @map("transfer_reason")
-  isApproved     Boolean  @default(false) @map("is_approved")
-
-  // Relations
-  reservation    Reservation @relation(fields: [reservationId], references: [id])
-  fromUser       User        @relation("FromUser", fields: [fromUserId], references: [id])
-  toUser         User        @relation("ToUser", fields: [toUserId], references: [id])
-
-  @@map("reservation_transfers")
-}
-
-model DateCapacity {
-  date           DateTime @id
-  totalBookings  Int      @default(0)
-  maxCapacity    Int      @default(60)
-  
-  // Relations
-  reservations   Reservation[]
-
-  @@map("date_capacities")
+enum TransferStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  CANCELLED
+  EXPIRED
 }
