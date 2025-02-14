@@ -92,9 +92,6 @@ export interface ErrorStates {
   submissionError: string | null;
 }
 
-// src/types/reservation.ts
-
-// Add these to the existing types file
 export interface Transfer {
   id: string;
   reservationId: string;

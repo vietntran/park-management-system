@@ -63,14 +63,6 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       throw new ValidationError("Reservation not found");
     }
 
-    // // Calculate expiration (24 hours from now or transfer deadline, whichever is earlier)
-    // const transferDeadline = getTransferDeadline(reservation.reservationDate);
-    // const twentyFourHoursFromNow = addHours(new Date(), 24);
-    // const expiresAt =
-    //   twentyFourHoursFromNow < transferDeadline
-    //     ? twentyFourHoursFromNow
-    //     : transferDeadline;
-
     // Create the transfer request
     const newTransfer = await tx.reservationTransfer.create({
       data: {
