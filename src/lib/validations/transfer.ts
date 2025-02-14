@@ -241,7 +241,7 @@ export async function canAcceptTransfer({
  * We take whichever comes FIRST (the earlier time)
  * If a transfer was created at 4 PM CT the day before, it would expire in 1 hour (at 5 PM CT) rather than getting a full 24 hours
  */
-export function getTransferValidUntil(
+export function getTransferExpiresAt(
   reservationDate: Date,
   currentTime: Date = new Date(),
 ): Date {

@@ -1,5 +1,4 @@
 import { TransferStatus } from "@prisma/client";
-import { addHours } from "date-fns";
 import { type NextRequest } from "next/server";
 import { getServerSession } from "next-auth";
 import { z } from "zod";
@@ -17,7 +16,7 @@ import logger from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
 import {
   canInitiateTransfer,
-  getTransferDeadline,
+  getTransferExpiresAt,
 } from "@/lib/validations/transfer";
 import type { Transfer } from "@/types/reservation";
 
@@ -64,13 +63,13 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       throw new ValidationError("Reservation not found");
     }
 
-    // Calculate expiration (24 hours from now or transfer deadline, whichever is earlier)
-    const transferDeadline = getTransferDeadline(reservation.reservationDate);
-    const twentyFourHoursFromNow = addHours(new Date(), 24);
-    const expiresAt =
-      twentyFourHoursFromNow < transferDeadline
-        ? twentyFourHoursFromNow
-        : transferDeadline;
+    // // Calculate expiration (24 hours from now or transfer deadline, whichever is earlier)
+    // const transferDeadline = getTransferDeadline(reservation.reservationDate);
+    // const twentyFourHoursFromNow = addHours(new Date(), 24);
+    // const expiresAt =
+    //   twentyFourHoursFromNow < transferDeadline
+    //     ? twentyFourHoursFromNow
+    //     : transferDeadline;
 
     // Create the transfer request
     const newTransfer = await tx.reservationTransfer.create({
@@ -80,7 +79,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
         toUserId,
         spotsToTransfer,
         isPrimaryTransfer,
-        expiresAt,
+        expiresAt: getTransferExpiresAt(reservation.reservationDate),
         status: TransferStatus.PENDING,
       },
       include: {

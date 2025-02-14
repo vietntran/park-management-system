@@ -17,7 +17,7 @@ import {
   canAcceptTransfer,
   getTransferDeadline,
   isWithinTransferDeadline,
-  getTransferValidUntil,
+  getTransferExpiresAt,
   isTransferExpired,
 } from "@/lib/validations/transfer";
 
@@ -321,7 +321,7 @@ describe("isWithinTransferDeadline", () => {
   });
 });
 
-describe("getTransferValidUntil", () => {
+describe("getTransferExpiresAt", () => {
   let mockReservationDate: Date;
   let mockCurrentTime: Date;
 
@@ -333,7 +333,7 @@ describe("getTransferValidUntil", () => {
   it("should return 24 hours from current time when that's earlier than transfer deadline", () => {
     // Set current time to 9 AM CT TWO days before (so 24 hours won't exceed deadline)
     mockCurrentTime = new Date("2025-02-13T15:00:00Z");
-    const expiration = getTransferValidUntil(
+    const expiration = getTransferExpiresAt(
       mockReservationDate,
       mockCurrentTime,
     );
@@ -346,7 +346,7 @@ describe("getTransferValidUntil", () => {
   it("should return transfer deadline when 24 hours would exceed it", () => {
     // Set current time to 2 PM CT day before (deadline is 5 PM CT)
     mockCurrentTime = new Date("2025-02-14T20:00:00Z");
-    const expiration = getTransferValidUntil(
+    const expiration = getTransferExpiresAt(
       mockReservationDate,
       mockCurrentTime,
     );
@@ -361,7 +361,7 @@ describe("getTransferValidUntil", () => {
     // Current time March 9, 2025 2 PM CDT (two days before)
     mockCurrentTime = new Date("2025-03-09T19:00:00Z");
 
-    const expiration = getTransferValidUntil(
+    const expiration = getTransferExpiresAt(
       mockReservationDate,
       mockCurrentTime,
     );
@@ -377,7 +377,7 @@ describe("getTransferValidUntil", () => {
     // Current time November 1, 2025 9 AM CST (two days before)
     mockCurrentTime = new Date("2025-11-01T14:00:00Z");
 
-    const expiration = getTransferValidUntil(
+    const expiration = getTransferExpiresAt(
       mockReservationDate,
       mockCurrentTime,
     );
@@ -392,7 +392,7 @@ describe("getTransferValidUntil", () => {
     const now = new Date("2025-02-13T15:00:00Z");
     jest.useFakeTimers().setSystemTime(now);
 
-    const expiration = getTransferValidUntil(mockReservationDate);
+    const expiration = getTransferExpiresAt(mockReservationDate);
 
     // Should be 24 hours from now
     const expected = new Date("2025-02-14T15:00:00Z");
