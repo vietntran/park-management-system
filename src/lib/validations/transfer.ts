@@ -4,7 +4,16 @@ import {
   ReservationUserStatus,
   TransferStatus,
 } from "@prisma/client";
-import { startOfDay, addDays, isBefore } from "date-fns";
+import {
+  addDays,
+  startOfDay,
+  setHours,
+  setMinutes,
+  setSeconds,
+  setMilliseconds,
+  isBefore,
+} from "date-fns";
+import { fromZonedTime, toZonedTime } from "date-fns-tz";
 
 import {
   ValidationError,
@@ -12,7 +21,6 @@ import {
   AuthorizationError,
 } from "@/lib/errors/ApplicationErrors";
 import { prisma } from "@/lib/prisma";
-import { getTransferDeadline } from "@/utils/dateUtils";
 
 import { validateConsecutiveDates } from "./reservation";
 
@@ -26,6 +34,43 @@ interface InitiateTransferParams {
 interface AcceptTransferParams {
   userId: string; // User attempting to accept transfer
   transferId: string; // Transfer being accepted
+}
+
+export const CENTRAL_TIME_ZONE = "America/Chicago";
+export const TRANSFER_DEADLINE_HOUR = 17; // 5 PM
+
+export function getTransferDeadline(reservationDate: Date): Date {
+  // Convert reservation date to CT
+  const reservationInCT = toZonedTime(reservationDate, CENTRAL_TIME_ZONE);
+
+  // Get day before at 5pm CT
+  const deadlineInCT = setMilliseconds(
+    setSeconds(
+      setMinutes(
+        setHours(
+          addDays(startOfDay(reservationInCT), -1),
+          TRANSFER_DEADLINE_HOUR,
+        ),
+        0,
+      ),
+      0,
+    ),
+    0,
+  );
+
+  // Convert back to UTC for storage
+  return fromZonedTime(deadlineInCT, CENTRAL_TIME_ZONE);
+}
+
+/**
+ * Checks if the current time is within the transfer deadline (before 5pm CT day prior)
+ */
+export function isWithinTransferDeadline(
+  reservationDate: Date,
+  currentTime: Date = new Date(),
+): boolean {
+  const deadline = getTransferDeadline(reservationDate);
+  return isBefore(currentTime, deadline);
 }
 
 /**
