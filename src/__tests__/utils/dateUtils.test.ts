@@ -1,6 +1,7 @@
 import {
   calculateConsecutiveDays,
   getTransferDeadline,
+  isWithinTransferDeadline,
 } from "@/utils/dateUtils";
 
 describe("calculateConsecutiveDays", () => {
@@ -80,5 +81,71 @@ describe("getTransferDeadline", () => {
 
     // Should be November 2, 2025 at 5 PM CT (non-DST)
     expect(deadline.toISOString()).toBe("2025-11-02T23:00:00.000Z"); // 5 PM CST = 11 PM UTC
+  });
+});
+
+describe("isWithinTransferDeadline", () => {
+  let mockReservationDate: Date;
+  let mockCurrentTime: Date;
+
+  beforeEach(() => {
+    // Reset to a known state - February 15, 2025 reservation
+    mockReservationDate = new Date("2025-02-15T12:00:00Z");
+    mockCurrentTime = new Date("2025-02-14T21:00:00Z"); // 3 PM CT on day before
+  });
+
+  it("should return true when current time is before deadline", () => {
+    const result = isWithinTransferDeadline(
+      mockReservationDate,
+      mockCurrentTime,
+    );
+    expect(result).toBe(true);
+  });
+
+  it("should return false when current time is after deadline", () => {
+    // 5:01 PM CT day before
+    mockCurrentTime = new Date("2025-02-14T23:01:00Z");
+    const result = isWithinTransferDeadline(
+      mockReservationDate,
+      mockCurrentTime,
+    );
+    expect(result).toBe(false);
+  });
+
+  it("should return false when current time is on reservation day", () => {
+    // 8 AM CT on reservation day
+    mockCurrentTime = new Date("2025-02-15T14:00:00Z");
+    const result = isWithinTransferDeadline(
+      mockReservationDate,
+      mockCurrentTime,
+    );
+    expect(result).toBe(false);
+  });
+
+  it("should use current time when no time provided", () => {
+    const now = new Date("2025-02-14T21:00:00Z"); // 3 PM CT day before
+    jest.useFakeTimers().setSystemTime(now);
+
+    const result = isWithinTransferDeadline(mockReservationDate);
+    expect(result).toBe(true);
+
+    jest.useRealTimers();
+  });
+
+  it("should handle DST changes", () => {
+    // Reservation during DST (March 11, 2025)
+    mockReservationDate = new Date("2025-03-11T12:00:00Z");
+
+    // 4:59 PM CDT day before (should pass)
+    mockCurrentTime = new Date("2025-03-10T21:59:00Z");
+    expect(isWithinTransferDeadline(mockReservationDate, mockCurrentTime)).toBe(
+      true,
+    );
+
+    // 5:01 PM CDT day before (should fail)
+    mockCurrentTime = new Date("2025-03-10T22:01:00Z");
+    expect(isWithinTransferDeadline(mockReservationDate, mockCurrentTime)).toBe(
+      false,
+    );
   });
 });

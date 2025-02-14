@@ -1,4 +1,4 @@
-// src/lib/utils/dateUtils.ts
+// src/utils/dateUtils.ts
 import {
   addDays,
   startOfDay,
@@ -6,8 +6,12 @@ import {
   setMinutes,
   setSeconds,
   setMilliseconds,
+  isBefore,
 } from "date-fns";
 import { fromZonedTime, toZonedTime } from "date-fns-tz";
+
+export const CENTRAL_TIME_ZONE = "America/Chicago";
+export const TRANSFER_DEADLINE_HOUR = 17; // 5 PM
 
 export function calculateConsecutiveDays(dates: number[]): number {
   let consecutiveDays = 1;
@@ -27,9 +31,6 @@ export function calculateConsecutiveDays(dates: number[]): number {
 
   return maxConsecutiveDays;
 }
-
-const CENTRAL_TIME_ZONE = "America/Chicago";
-const TRANSFER_DEADLINE_HOUR = 17; // 5 PM
 
 export function getTransferDeadline(reservationDate: Date): Date {
   // Convert reservation date to CT
@@ -52,4 +53,15 @@ export function getTransferDeadline(reservationDate: Date): Date {
 
   // Convert back to UTC for storage
   return fromZonedTime(deadlineInCT, CENTRAL_TIME_ZONE);
+}
+
+/**
+ * Checks if the current time is within the transfer deadline (before 5pm CT day prior)
+ */
+export function isWithinTransferDeadline(
+  reservationDate: Date,
+  currentTime: Date = new Date(),
+): boolean {
+  const deadline = getTransferDeadline(reservationDate);
+  return isBefore(currentTime, deadline);
 }
