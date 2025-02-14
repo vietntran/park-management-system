@@ -15,10 +15,10 @@ import { validateConsecutiveDates } from "@/lib/validations/reservation";
 import {
   canInitiateTransfer,
   canAcceptTransfer,
-} from "@/lib/validations/transfer";
-import {
   getTransferDeadline,
   isWithinTransferDeadline,
+  getTransferValidUntil,
+  isTransferExpired,
 } from "@/lib/validations/transfer";
 
 // Mock dependencies
@@ -318,5 +318,155 @@ describe("isWithinTransferDeadline", () => {
     expect(isWithinTransferDeadline(mockReservationDate, mockCurrentTime)).toBe(
       false,
     );
+  });
+});
+
+describe("getTransferValidUntil", () => {
+  let mockReservationDate: Date;
+  let mockCurrentTime: Date;
+
+  beforeEach(() => {
+    // Reset to a known state - February 15, 2025 reservation
+    mockReservationDate = new Date("2025-02-15T12:00:00Z");
+  });
+
+  it("should return 24 hours from current time when that's earlier than transfer deadline", () => {
+    // Set current time to 9 AM CT TWO days before (so 24 hours won't exceed deadline)
+    mockCurrentTime = new Date("2025-02-13T15:00:00Z");
+    const expiration = getTransferValidUntil(
+      mockReservationDate,
+      mockCurrentTime,
+    );
+
+    // Should be 24 hours from mockCurrentTime
+    const expected = new Date("2025-02-14T15:00:00Z");
+    expect(expiration.toISOString()).toBe(expected.toISOString());
+  });
+
+  it("should return transfer deadline when 24 hours would exceed it", () => {
+    // Set current time to 2 PM CT day before (deadline is 5 PM CT)
+    mockCurrentTime = new Date("2025-02-14T20:00:00Z");
+    const expiration = getTransferValidUntil(
+      mockReservationDate,
+      mockCurrentTime,
+    );
+
+    // Should be deadline (5 PM CT = 11 PM UTC)
+    expect(expiration.toISOString()).toBe("2025-02-14T23:00:00.000Z");
+  });
+
+  it("should handle DST start (Spring Forward)", () => {
+    // Reservation on March 11, 2025 (after DST starts)
+    mockReservationDate = new Date("2025-03-11T12:00:00Z");
+    // Current time March 9, 2025 2 PM CDT (two days before)
+    mockCurrentTime = new Date("2025-03-09T19:00:00Z");
+
+    const expiration = getTransferValidUntil(
+      mockReservationDate,
+      mockCurrentTime,
+    );
+
+    // Should be 24 hours later since we're well before deadline
+    const expected = new Date("2025-03-10T19:00:00Z");
+    expect(expiration.toISOString()).toBe(expected.toISOString());
+  });
+
+  it("should handle DST end (Fall Back)", () => {
+    // Reservation on November 3, 2025 (after DST ends)
+    mockReservationDate = new Date("2025-11-03T12:00:00Z");
+    // Current time November 1, 2025 9 AM CST (two days before)
+    mockCurrentTime = new Date("2025-11-01T14:00:00Z");
+
+    const expiration = getTransferValidUntil(
+      mockReservationDate,
+      mockCurrentTime,
+    );
+
+    // Should be 24 hours later since we're well before deadline
+    const expected = new Date("2025-11-02T14:00:00Z");
+    expect(expiration.toISOString()).toBe(expected.toISOString());
+  });
+
+  it("should use current time when no time provided", () => {
+    // Set system time to 9 AM CT two days before
+    const now = new Date("2025-02-13T15:00:00Z");
+    jest.useFakeTimers().setSystemTime(now);
+
+    const expiration = getTransferValidUntil(mockReservationDate);
+
+    // Should be 24 hours from now
+    const expected = new Date("2025-02-14T15:00:00Z");
+    expect(expiration.toISOString()).toBe(expected.toISOString());
+
+    jest.useRealTimers();
+  });
+});
+
+describe("isTransferExpired", () => {
+  let mockTransfer: {
+    expiresAt: Date;
+    reservation: {
+      reservationDate: Date;
+    };
+  };
+  let mockCurrentTime: Date;
+
+  beforeEach(() => {
+    // Reset to a known state
+    mockTransfer = {
+      expiresAt: new Date("2025-02-14T23:00:00Z"), // 5 PM CT
+      reservation: {
+        reservationDate: new Date("2025-02-15T12:00:00Z"), // noon UTC
+      },
+    };
+    mockCurrentTime = new Date("2025-02-14T22:00:00Z"); // 4 PM CT
+  });
+
+  it("should return false when current time is before expiration and deadline", () => {
+    const result = isTransferExpired(mockTransfer, mockCurrentTime);
+    expect(result).toBe(false);
+  });
+
+  it("should return true when current time is after expiration", () => {
+    mockCurrentTime = new Date("2025-02-14T23:30:00Z"); // 5:30 PM CT
+    const result = isTransferExpired(mockTransfer, mockCurrentTime);
+    expect(result).toBe(true);
+  });
+
+  it("should return true when current time is after transfer deadline", () => {
+    // Set expiration to later time but we're past deadline
+    mockTransfer.expiresAt = new Date("2025-02-15T02:00:00Z"); // 8 PM CT
+    mockCurrentTime = new Date("2025-02-14T23:30:00Z"); // 5:30 PM CT
+
+    const result = isTransferExpired(mockTransfer, mockCurrentTime);
+    expect(result).toBe(true);
+  });
+
+  it("should handle DST changes", () => {
+    // During DST
+    mockTransfer = {
+      expiresAt: new Date("2025-03-10T22:00:00Z"), // 5 PM CDT
+      reservation: {
+        reservationDate: new Date("2025-03-11T12:00:00Z"),
+      },
+    };
+
+    // 4:59 PM CDT (should not be expired)
+    mockCurrentTime = new Date("2025-03-10T21:59:00Z");
+    expect(isTransferExpired(mockTransfer, mockCurrentTime)).toBe(false);
+
+    // 5:01 PM CDT (should be expired)
+    mockCurrentTime = new Date("2025-03-10T22:01:00Z");
+    expect(isTransferExpired(mockTransfer, mockCurrentTime)).toBe(true);
+  });
+
+  it("should use current time when no time provided", () => {
+    const now = new Date("2025-02-14T22:00:00Z"); // 4 PM CT
+    jest.useFakeTimers().setSystemTime(now);
+
+    const result = isTransferExpired(mockTransfer);
+    expect(result).toBe(false);
+
+    jest.useRealTimers();
   });
 });

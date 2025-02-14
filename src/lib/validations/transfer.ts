@@ -12,6 +12,7 @@ import {
   setSeconds,
   setMilliseconds,
   isBefore,
+  addHours,
 } from "date-fns";
 import { fromZonedTime, toZonedTime } from "date-fns-tz";
 
@@ -229,4 +230,45 @@ export async function canAcceptTransfer({
   await validateConsecutiveDates(userId, transfer.reservation.reservationDate);
 
   return true;
+}
+
+/**
+ * A newly created transfer expires
+ *
+ * 1. 24 hours from time of creation
+ * 2. OR 5 PM CT the day before the reservation
+ *
+ * We take whichever comes FIRST (the earlier time)
+ * If a transfer was created at 4 PM CT the day before, it would expire in 1 hour (at 5 PM CT) rather than getting a full 24 hours
+ */
+export function getTransferValidUntil(
+  reservationDate: Date,
+  currentTime: Date = new Date(),
+): Date {
+  const transferDeadline = getTransferDeadline(reservationDate);
+  const twentyFourHoursFromNow = addHours(currentTime, 24);
+
+  return isBefore(twentyFourHoursFromNow, transferDeadline)
+    ? twentyFourHoursFromNow
+    : transferDeadline;
+}
+
+/**
+ * Checks if a transfer has expired
+ * A transfer is expired if:
+ * 1. Current time is past the expiration time
+ * 2. Current time is past the transfer deadline (5 PM CT day before)
+ */
+export function isTransferExpired(
+  transfer: { expiresAt: Date; reservation: { reservationDate: Date } },
+  currentTime: Date = new Date(),
+): boolean {
+  const transferDeadline = getTransferDeadline(
+    transfer.reservation.reservationDate,
+  );
+
+  return (
+    isBefore(transfer.expiresAt, currentTime) ||
+    isBefore(transferDeadline, currentTime)
+  );
 }
