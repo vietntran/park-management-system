@@ -15,6 +15,7 @@ import {
 import type { Transfer } from "@/types/reservation";
 
 interface TransferListProps {
+  currentUserId: string;
   transfers: Transfer[];
   onAcceptTransfer: (transferId: string) => Promise<void>;
   onDeclineTransfer: (transferId: string) => Promise<void>;
@@ -22,6 +23,7 @@ interface TransferListProps {
 }
 
 const TransferList = ({
+  currentUserId,
   transfers,
   onAcceptTransfer,
   onDeclineTransfer,
@@ -29,8 +31,7 @@ const TransferList = ({
 }: TransferListProps) => {
   const groupedTransfers = transfers.reduce(
     (acc, transfer) => {
-      const key =
-        transfer.toUserId === transfer.fromUserId ? "sent" : "received";
+      const key = transfer.fromUserId === currentUserId ? "sent" : "received";
       if (!acc[key]) acc[key] = [];
       acc[key].push(transfer);
       return acc;
