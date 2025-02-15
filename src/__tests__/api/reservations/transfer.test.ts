@@ -10,7 +10,7 @@ import { addDays, startOfDay } from "date-fns";
 import { NextRequest } from "next/server";
 import { act } from "react";
 
-import { POST } from "@/app/api/reservations/transfer/route";
+import { GET, POST } from "@/app/api/reservations/transfer/route";
 import { RESERVATION_LIMITS } from "@/constants/reservation";
 import { ValidationError } from "@/lib/errors/ApplicationErrors";
 import { prisma } from "@/lib/prisma";
@@ -39,6 +39,7 @@ jest.mock("@/lib/prisma", () => ({
     },
     reservationTransfer: {
       create: jest.fn(),
+      findMany: jest.fn(),
     },
     user: {
       findUnique: jest.fn(),
@@ -383,5 +384,182 @@ describe("POST /api/transfer", () => {
 
     expect(response.status).toBe(400);
     expect(data.error).toContain("maximum consecutive reservations");
+  });
+});
+
+describe("GET /api/reservations/transfer", () => {
+  const mockSession = {
+    user: {
+      id: "123e4567-e89b-12d3-a456-426614174000",
+      email: "from@example.com",
+      name: "From User",
+    },
+    expires: new Date(Date.now() + 86400000).toISOString(),
+  };
+
+  const futureDateForValidTransfer = addDays(
+    startOfDay(new Date()),
+    3,
+  ).toISOString();
+
+  const mockTransfer = {
+    id: "123e4567-e89b-12d3-a456-426614174003",
+    reservationId: "123e4567-e89b-12d3-a456-426614174001",
+    fromUserId: mockSession.user.id,
+    toUserId: "123e4567-e89b-12d3-a456-426614174002",
+    expiresAt: new Date().toISOString(),
+    isPrimaryTransfer: true,
+    requestedAt: new Date().toISOString(),
+    respondedAt: null,
+    spotsToTransfer: [mockSession.user.id],
+    status: TransferStatus.PENDING,
+    fromUser: {
+      id: mockSession.user.id,
+      name: "From User",
+      email: "from@example.com",
+    },
+    toUser: {
+      id: "123e4567-e89b-12d3-a456-426614174002",
+      name: "To User",
+      email: "to@example.com",
+    },
+    reservation: {
+      id: "123e4567-e89b-12d3-a456-426614174001",
+      primaryUserId: mockSession.user.id,
+      reservationDate: futureDateForValidTransfer,
+      status: ReservationStatus.ACTIVE,
+      canTransfer: true,
+      reservationUsers: [
+        {
+          userId: mockSession.user.id,
+          status: ReservationUserStatus.ACTIVE,
+          isPrimary: true,
+          user: {
+            id: mockSession.user.id,
+            name: "From User",
+            email: "from@example.com",
+            emailVerified: null,
+            isProfileComplete: true,
+          },
+        },
+      ],
+      dateCapacity: {
+        totalBookings: 30,
+      },
+    },
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (
+      jest.requireMock("next-auth/next") as { getServerSession: jest.Mock }
+    ).getServerSession.mockResolvedValue(null);
+    (prisma.reservationTransfer.findMany as jest.Mock).mockResolvedValue([
+      mockTransfer,
+    ]);
+  });
+
+  test("returns pending transfers successfully", async () => {
+    (
+      jest.requireMock("next-auth/next") as { getServerSession: jest.Mock }
+    ).getServerSession.mockResolvedValue({
+      user: { id: mockSession.user.id },
+    });
+
+    const request = new Request("http://localhost:3000/api/transfers", {
+      method: "GET",
+    }) as unknown as NextRequest;
+
+    const response = await act(async () => await GET(request));
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.success).toBe(true);
+    expect(data.data).toEqual([
+      {
+        ...mockTransfer,
+        reservation: {
+          ...mockTransfer.reservation,
+          dateCapacity: {
+            totalBookings: 30,
+            remainingSpots: RESERVATION_LIMITS.MAX_DAILY_RESERVATIONS - 30,
+          },
+        },
+      },
+    ]);
+
+    expect(prisma.reservationTransfer.findMany).toHaveBeenCalledWith({
+      where: {
+        OR: [
+          { fromUserId: mockSession.user.id },
+          { toUserId: mockSession.user.id },
+        ],
+        status: TransferStatus.PENDING,
+      },
+      include: expect.any(Object),
+      orderBy: {
+        requestedAt: "desc",
+      },
+    });
+  });
+
+  test("returns 401 when user is not authenticated", async () => {
+    const request = new Request("http://localhost:3000/api/transfers", {
+      method: "GET",
+    }) as unknown as NextRequest;
+
+    const response = await act(async () => await GET(request));
+    const data = await response.json();
+
+    expect(response.status).toBe(401);
+    expect(data).toEqual({
+      error: "Authentication required",
+    });
+  });
+
+  test("returns empty array when no pending transfers exist", async () => {
+    (
+      jest.requireMock("next-auth/next") as { getServerSession: jest.Mock }
+    ).getServerSession.mockResolvedValue({
+      user: { id: mockSession.user.id },
+    });
+    (prisma.reservationTransfer.findMany as jest.Mock).mockResolvedValue([]);
+
+    const request = new Request("http://localhost:3000/api/transfers", {
+      method: "GET",
+    }) as unknown as NextRequest;
+
+    const response = await act(async () => await GET(request));
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data).toEqual({
+      success: true,
+      data: [],
+    });
+  });
+
+  test("handles database errors gracefully", async () => {
+    (
+      jest.requireMock("next-auth/next") as { getServerSession: jest.Mock }
+    ).getServerSession.mockResolvedValue({
+      user: { id: mockSession.user.id },
+    });
+    const dbError = new Error("Database error");
+    (prisma.reservationTransfer.findMany as jest.Mock).mockRejectedValue(
+      dbError,
+    );
+
+    const request = new Request("http://localhost:3000/api/transfers", {
+      method: "GET",
+    }) as unknown as NextRequest;
+
+    const response = await act(async () => await GET(request));
+    const data = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(data).toEqual({
+      error: "Internal server error",
+    });
   });
 });

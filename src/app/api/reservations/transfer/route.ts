@@ -28,6 +28,90 @@ const createTransferSchema = z.object({
   isPrimaryTransfer: z.boolean(),
 });
 
+export const GET = withErrorHandler(async () => {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    throw new AuthenticationError();
+  }
+
+  const transfers = await prisma.reservationTransfer.findMany({
+    where: {
+      OR: [{ fromUserId: session.user.id }, { toUserId: session.user.id }],
+      status: TransferStatus.PENDING,
+    },
+    include: {
+      fromUser: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
+      toUser: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
+      reservation: {
+        include: {
+          reservationUsers: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                  emailVerified: true,
+                  isProfileComplete: true,
+                },
+              },
+            },
+          },
+          dateCapacity: true,
+        },
+        select: {
+          id: true,
+          primaryUserId: true,
+          reservationDate: true,
+          createdAt: true,
+          status: true,
+          canTransfer: true,
+          reservationUsers: true,
+          dateCapacity: true,
+        },
+      },
+    },
+    orderBy: {
+      requestedAt: "desc",
+    },
+  });
+
+  // Transform transfers to include remaining spots calculation
+  const transformedTransfers: Transfer[] = transfers.map((transfer) => ({
+    ...transfer,
+    reservation: transfer.reservation
+      ? {
+          ...transfer.reservation,
+          dateCapacity: {
+            totalBookings: transfer.reservation.dateCapacity.totalBookings,
+            remainingSpots:
+              RESERVATION_LIMITS.MAX_DAILY_RESERVATIONS -
+              transfer.reservation.dateCapacity.totalBookings,
+          },
+        }
+      : undefined,
+  }));
+
+  logger.info("Retrieved pending transfers", {
+    userId: session.user.id,
+    count: transfers.length,
+  });
+
+  return createSuccessResponse(transformedTransfers);
+});
+
 export const POST = withErrorHandler(async (req: NextRequest) => {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
