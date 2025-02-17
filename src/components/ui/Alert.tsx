@@ -6,7 +6,7 @@ interface AlertProps extends React.HTMLAttributes<HTMLDivElement> {
   variant?: "success" | "error" | "warning" | "info";
 }
 
-const alertStyles = {
+export const alertStyles = {
   success: "bg-green-50 text-green-700",
   error: "bg-red-50 text-red-700",
   warning: "bg-yellow-50 text-yellow-700",

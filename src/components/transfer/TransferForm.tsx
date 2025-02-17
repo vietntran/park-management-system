@@ -1,34 +1,21 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Search } from "lucide-react";
-import React, { useState } from "react";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
+import { UserSearch } from "@/components/reservation/UserSearch";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-} from "@/components/ui/command";
-import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { handleFormError } from "@/lib/errors/clientErrorHandler";
 import type {
   Reservation,
@@ -51,19 +38,16 @@ interface TransferFormProps {
   reservation: Reservation;
   onSubmit: (data: TransferFormData) => Promise<void>;
   onCancel: () => void;
-  searchUsers: (query: string) => Promise<SelectedUser[]>;
 }
 
 export const TransferForm = ({
   reservation,
   onSubmit,
   onCancel,
-  searchUsers,
 }: TransferFormProps) => {
-  const [searchResults, setSearchResults] = useState<SelectedUser[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const [searchOpen, setSearchOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isValidatingUsers, setIsValidatingUsers] = useState(false);
+  const [selectedUserName, setSelectedUserName] = useState<string>("");
 
   const form = useForm<TransferFormData>({
     resolver: zodResolver(transferFormSchema),
@@ -75,17 +59,29 @@ export const TransferForm = ({
     },
   });
 
-  const handleSearch = async (query: string) => {
-    if (query.length < 2) return;
-    setIsSearching(true);
+  const isPrimaryUser =
+    reservation.primaryUserId ===
+    reservation.reservationUsers.find((ru) => ru.isPrimary)?.userId;
+
+  const transferableSpots = reservation.reservationUsers.filter(
+    (ru) => isPrimaryUser || ru.userId === reservation.primaryUserId,
+  );
+
+  const handleUserSelect = async (users: SelectedUser[]) => {
+    setIsValidatingUsers(true);
     try {
-      const results = await searchUsers(query);
-      setSearchResults(results);
-      setError(null);
+      const selectedUser = users[0];
+      if (selectedUser) {
+        form.setValue("toUserId", selectedUser.id, {
+          shouldValidate: true,
+        });
+        setSelectedUserName(selectedUser.name);
+        setError(null);
+      }
     } catch (err) {
       setError(handleFormError(err));
     } finally {
-      setIsSearching(false);
+      setIsValidatingUsers(false);
     }
   };
 
@@ -97,14 +93,6 @@ export const TransferForm = ({
       setError(handleFormError(err));
     }
   };
-
-  const isPrimaryUser =
-    reservation.primaryUserId ===
-    reservation.reservationUsers.find((ru) => ru.isPrimary)?.userId;
-
-  const transferableSpots = reservation.reservationUsers.filter(
-    (ru) => isPrimaryUser || ru.userId === reservation.primaryUserId,
-  );
 
   return (
     <Card className="max-w-2xl mx-auto">
@@ -147,57 +135,22 @@ export const TransferForm = ({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Transfer To</FormLabel>
-                  <Popover open={searchOpen} onOpenChange={setSearchOpen}>
-                    <PopoverTrigger asChild>
-                      <FormControl>
-                        <Button
-                          variant="outline"
-                          role="combobox"
-                          className="w-full justify-between"
-                        >
-                          {field.value
-                            ? searchResults.find(
-                                (user) => user.id === field.value,
-                              )?.name
-                            : "Search for a user..."}
-                          <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                        </Button>
-                      </FormControl>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[400px] p-0">
-                      <Command>
-                        <CommandInput
-                          placeholder="Search users..."
-                          onValueChange={handleSearch}
-                          className="h-9"
-                        />
-                        {isSearching ? (
-                          <CommandEmpty>Searching...</CommandEmpty>
-                        ) : (
-                          <CommandEmpty>No users found.</CommandEmpty>
-                        )}
-                        <CommandGroup>
-                          {searchResults.map((user) => (
-                            <CommandItem
-                              key={user.id}
-                              value={user.id}
-                              onSelect={() => {
-                                form.setValue("toUserId", user.id, {
-                                  shouldValidate: true,
-                                });
-                                setSearchOpen(false);
-                              }}
-                            >
-                              <span>{user.name}</span>
-                              <span className="ml-2 text-sm text-muted-foreground">
-                                {user.email}
-                              </span>
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
+                  <UserSearch
+                    onUserSelect={handleUserSelect}
+                    selectedUsers={
+                      field.value
+                        ? [
+                            {
+                              id: field.value,
+                              name: selectedUserName,
+                              email: "",
+                            },
+                          ]
+                        : []
+                    }
+                    maxUsers={1}
+                    isLoading={isValidatingUsers}
+                  />
                   <FormMessage />
                 </FormItem>
               )}
@@ -226,14 +179,21 @@ export const TransferForm = ({
                             <FormControl>
                               <Checkbox
                                 checked={field.value?.includes(spot.userId)}
-                                onCheckedChange={(checked) => {
+                                onCheckedChange={async (checked) => {
                                   const value = field.value || [];
                                   const newValue = checked
                                     ? [...value, spot.userId]
                                     : value.filter((id) => id !== spot.userId);
+
+                                  // Set value with validation
                                   form.setValue("spotsToTransfer", newValue, {
                                     shouldValidate: true,
+                                    shouldDirty: true,
+                                    shouldTouch: true,
                                   });
+
+                                  // Trigger validation explicitly
+                                  await form.trigger("spotsToTransfer");
                                 }}
                               />
                             </FormControl>
@@ -264,9 +224,9 @@ export const TransferForm = ({
                     </FormControl>
                     <div className="space-y-1">
                       <FormLabel>Transfer Primary Role</FormLabel>
-                      <FormDescription>
+                      <p className="text-sm text-muted-foreground">
                         Transfer primary reservation holder responsibilities
-                      </FormDescription>
+                      </p>
                     </div>
                   </FormItem>
                 )}
@@ -274,7 +234,7 @@ export const TransferForm = ({
             )}
 
             {error && (
-              <Alert variant="error">
+              <Alert variant="error" role="alert">
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
@@ -285,7 +245,7 @@ export const TransferForm = ({
               </Button>
               <Button
                 type="submit"
-                disabled={form.formState.isSubmitting || isSearching}
+                disabled={form.formState.isSubmitting || isValidatingUsers}
               >
                 {form.formState.isSubmitting
                   ? "Creating Transfer..."
