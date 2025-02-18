@@ -9,6 +9,7 @@ import { HTTP_STATUS } from "@/constants/http";
 import { prisma } from "@/lib/prisma";
 import { emailService } from "@/services/emailService";
 import { createRateLimiter } from "@/services/rateLimitService";
+import { TEST_UUIDS } from "@/test-utils/constants";
 import {
   createMockUser,
   createMockVerificationToken,
@@ -133,7 +134,7 @@ describe("Auth register API Route", () => {
       const body = await response.json();
       expect(body.data).toEqual({
         user: {
-          id: "test-user-id",
+          id: TEST_UUIDS.USERS.PRIMARY,
           email: validRegistrationData.email,
           name: validRegistrationData.name,
           isProfileComplete: false,
