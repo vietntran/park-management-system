@@ -28,14 +28,15 @@ export const TEST_UUIDS = {
     SECOND: generateSequentialUuid(10),
     THIRD: generateSequentialUuid(11),
     FOURTH: generateSequentialUuid(12), // For testing the 3 consecutive dates limit
+    NOT_FOUND: generateSequentialUuid(13),
   },
 
   // Transfers - For testing various transfer scenarios
   TRANSFERS: {
-    PENDING: generateSequentialUuid(13),
-    ACCEPTED: generateSequentialUuid(14),
-    DECLINED: generateSequentialUuid(15),
-    EXPIRED: generateSequentialUuid(16),
+    PENDING: generateSequentialUuid(14),
+    ACCEPTED: generateSequentialUuid(15),
+    DECLINED: generateSequentialUuid(16),
+    EXPIRED: generateSequentialUuid(17),
   },
 } as const;
 

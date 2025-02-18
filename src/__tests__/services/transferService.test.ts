@@ -8,6 +8,8 @@ import { addDays, startOfDay } from "date-fns";
 
 import { typedFetch } from "@/lib/utils";
 import { transferService } from "@/services/transferService";
+import { TEST_UUIDS } from "@/test-utils/constants";
+import { createMockReservation } from "@/test-utils/factories/reservationFactory";
 import type { Transfer, TransferFormData } from "@/types/reservation";
 
 // Mock typedFetch
@@ -199,6 +201,70 @@ describe("transferService", () => {
 
       await expect(
         transferService.respondToTransfer(mockTransferId, "accept"),
+      ).rejects.toEqual(notFoundError);
+    });
+  });
+
+  describe("getReservationForTransfer", () => {
+    const mockReservation = createMockReservation({
+      id: TEST_UUIDS.RESERVATIONS.FIRST,
+      primaryUserId: TEST_UUIDS.USERS.PRIMARY,
+      canTransfer: true,
+      status: ReservationStatus.ACTIVE,
+    });
+
+    test("calls correct endpoint with GET method", async () => {
+      (typedFetch as jest.Mock).mockResolvedValue({ data: mockReservation });
+
+      await transferService.getReservationForTransfer(
+        TEST_UUIDS.RESERVATIONS.FIRST,
+      );
+
+      expect(typedFetch).toHaveBeenCalledWith(
+        `/api/reservations/${TEST_UUIDS.RESERVATIONS.FIRST}`,
+        expect.objectContaining({
+          signal: undefined,
+        }),
+      );
+    });
+
+    test("passes abort signal when provided", async () => {
+      const abortController = new AbortController();
+      await transferService.getReservationForTransfer(
+        TEST_UUIDS.RESERVATIONS.FIRST,
+        abortController.signal,
+      );
+
+      expect(typedFetch).toHaveBeenCalledWith(
+        `/api/reservations/${TEST_UUIDS.RESERVATIONS.FIRST}`,
+        expect.objectContaining({
+          signal: abortController.signal,
+        }),
+      );
+    });
+
+    test("handles fetch errors appropriately", async () => {
+      const error = new Error("Network error");
+      (typedFetch as jest.Mock).mockRejectedValue(error);
+
+      await expect(
+        transferService.getReservationForTransfer(
+          TEST_UUIDS.RESERVATIONS.FIRST,
+        ),
+      ).rejects.toThrow("Network error");
+    });
+
+    test("handles not found errors", async () => {
+      const notFoundError = {
+        error: "Reservation not found",
+        status: 404,
+      };
+      (typedFetch as jest.Mock).mockRejectedValue(notFoundError);
+
+      await expect(
+        transferService.getReservationForTransfer(
+          TEST_UUIDS.RESERVATIONS.NOT_FOUND,
+        ),
       ).rejects.toEqual(notFoundError);
     });
   });

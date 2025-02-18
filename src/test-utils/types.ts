@@ -1,6 +1,11 @@
 // src/__tests__/utils/types.ts
-import type { User, VerificationToken } from "@prisma/client";
-import type { ReservationTransfer, Reservation } from "@prisma/client";
+import type {
+  ReservationStatus,
+  ReservationUserStatus,
+  User,
+  VerificationToken,
+} from "@prisma/client";
+import type { ReservationTransfer } from "@prisma/client";
 
 import type { Address, AddressInput } from "@/types/address";
 import type { UserProfile } from "@/types/user";
@@ -24,5 +29,31 @@ export type MockUserWithProfileOptions = MockUserOptions & {
   profile?: MockUserProfileOptions;
 };
 
-export type MockReservationOptions = Partial<Reservation>;
+export interface MockReservationOptions {
+  id?: string;
+  primaryUserId?: string;
+  status?: ReservationStatus;
+  reservationUsers?: Array<{
+    userId: string;
+    status: ReservationUserStatus;
+    isPrimary: boolean;
+    addedAt: Date;
+    cancelledAt: Date | null;
+    reservationId: string;
+    user?: {
+      id: string;
+      name: string;
+      email: string;
+      emailVerified: Date | null;
+      isProfileComplete: boolean;
+    };
+  }>;
+  dateCapacity?: {
+    totalBookings: number;
+    remainingSpots: number;
+  };
+  reservationDate?: Date;
+  createdAt?: Date;
+  canTransfer?: boolean;
+}
 export type MockTransferOptions = Partial<ReservationTransfer>;

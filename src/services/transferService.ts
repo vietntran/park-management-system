@@ -1,9 +1,21 @@
 // src/services/transferService.ts
 import type { ApiResponse } from "@/lib/api/withErrorHandler";
 import { typedFetch } from "@/lib/utils";
-import type { Transfer, TransferFormData } from "@/types/reservation";
+import type {
+  Reservation,
+  Transfer,
+  TransferFormData,
+} from "@/types/reservation";
 
 export const transferService = {
+  async getReservationForTransfer(
+    reservationId: string,
+    signal?: AbortSignal,
+  ): Promise<ApiResponse<Reservation>> {
+    return typedFetch<Reservation>(`/api/reservations/${reservationId}`, {
+      signal,
+    });
+  },
   async getPendingTransfers(
     signal?: AbortSignal,
   ): Promise<ApiResponse<Transfer[]>> {
