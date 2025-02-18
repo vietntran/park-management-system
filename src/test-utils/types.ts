@@ -1,5 +1,6 @@
 // src/__tests__/utils/types.ts
 import type { User, VerificationToken } from "@prisma/client";
+import type { ReservationTransfer, Reservation } from "@prisma/client";
 
 import type { Address, AddressInput } from "@/types/address";
 import type { UserProfile } from "@/types/user";
@@ -22,3 +23,6 @@ export type MockAddressInputOptions = Partial<AddressInput>;
 export type MockUserWithProfileOptions = MockUserOptions & {
   profile?: MockUserProfileOptions;
 };
+
+export type MockReservationOptions = Partial<Reservation>;
+export type MockTransferOptions = Partial<ReservationTransfer>;

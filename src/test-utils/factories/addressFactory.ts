@@ -1,3 +1,4 @@
+import { TEST_UUIDS } from "../constants";
 import type { MockAddressOptions } from "../types";
 
 export const createMockAddress = (overrides?: MockAddressOptions) => ({
@@ -6,8 +7,8 @@ export const createMockAddress = (overrides?: MockAddressOptions) => ({
   city: "Test City",
   state: "TS",
   zipCode: "12345",
-  userId: "test-user-id",
-  id: "test-address-id",
+  userId: TEST_UUIDS.USERS.PRIMARY,
+  id: TEST_UUIDS.ADDRESSES.PRIMARY,
   createdAt: new Date(),
   updatedAt: new Date(),
   ...overrides,

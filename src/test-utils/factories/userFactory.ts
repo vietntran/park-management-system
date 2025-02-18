@@ -1,3 +1,4 @@
+import { TEST_UUIDS } from "../constants";
 import type { MockUserOptions } from "../types";
 
 import { createMockAddress } from "./addressFactory";
@@ -5,7 +6,7 @@ import { createMockAddress } from "./addressFactory";
 export const createMockUser = (overrides?: MockUserOptions) => {
   const now = new Date();
   const defaultUser = {
-    id: "test-user-id",
+    id: TEST_UUIDS.USERS.PRIMARY,
     email: "test@example.com",
     name: "Test User",
     phone: "1234567890",
