@@ -1,5 +1,6 @@
 import { TransferStatus } from "@prisma/client";
 import { formatDistanceToNow } from "date-fns";
+import { Loader2 } from "lucide-react";
 import React from "react";
 
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +13,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { useLoadingStates } from "@/hooks/useLoadingStates";
+import { transferNotifications } from "@/lib/notifications";
 import type { Transfer } from "@/types/reservation";
 
 interface TransferListProps {
@@ -29,6 +32,55 @@ const TransferList = ({
   onDeclineTransfer,
   onCancelTransfer,
 }: TransferListProps) => {
+  const { loadingStates, setLoading } = useLoadingStates();
+
+  const handleAcceptTransfer = async (transferId: string) => {
+    setLoading("isSubmitting", true);
+
+    try {
+      await onAcceptTransfer(transferId);
+      transferNotifications.accepted();
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "An unexpected error occurred";
+      transferNotifications.actionError("accept", errorMessage);
+    } finally {
+      setLoading("isSubmitting", false);
+    }
+  };
+
+  const handleDeclineTransfer = async (transferId: string) => {
+    setLoading("isSubmitting", true);
+
+    try {
+      await onDeclineTransfer(transferId);
+      transferNotifications.declined();
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "An unexpected error occurred";
+      transferNotifications.actionError("decline", errorMessage);
+    } finally {
+      setLoading("isSubmitting", false);
+    }
+  };
+
+  const handleCancelTransfer = async (transferId: string) => {
+    if (!onCancelTransfer) return;
+
+    setLoading("isSubmitting", true);
+
+    try {
+      await onCancelTransfer(transferId);
+      transferNotifications.created(); // Consider adding a specific cancel success notification
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "An unexpected error occurred";
+      transferNotifications.actionError("cancel", errorMessage);
+    } finally {
+      setLoading("isSubmitting", false);
+    }
+  };
+
   const groupedTransfers = transfers.reduce(
     (acc, transfer) => {
       const key = transfer.fromUserId === currentUserId ? "sent" : "received";
@@ -47,6 +99,7 @@ const TransferList = ({
     const expiresIn = formatDistanceToNow(new Date(transfer.expiresAt), {
       addSuffix: true,
     });
+    const isActionInProgress = loadingStates.isSubmitting;
 
     return (
       <Card key={transfer.id} className="mb-4">
@@ -90,21 +143,47 @@ const TransferList = ({
               <>
                 <Button
                   variant="outline"
-                  onClick={() => onDeclineTransfer(transfer.id)}
+                  onClick={() => handleDeclineTransfer(transfer.id)}
+                  disabled={isActionInProgress}
                 >
-                  Decline
+                  {isActionInProgress ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Declining...
+                    </>
+                  ) : (
+                    "Decline"
+                  )}
                 </Button>
-                <Button onClick={() => onAcceptTransfer(transfer.id)}>
-                  Accept
+                <Button
+                  onClick={() => handleAcceptTransfer(transfer.id)}
+                  disabled={isActionInProgress}
+                >
+                  {isActionInProgress ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Accepting...
+                    </>
+                  ) : (
+                    "Accept"
+                  )}
                 </Button>
               </>
             ) : (
               onCancelTransfer && (
                 <Button
                   variant="destructive"
-                  onClick={() => onCancelTransfer(transfer.id)}
+                  onClick={() => handleCancelTransfer(transfer.id)}
+                  disabled={isActionInProgress}
                 >
-                  Cancel Transfer
+                  {isActionInProgress ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Cancelling...
+                    </>
+                  ) : (
+                    "Cancel Transfer"
+                  )}
                 </Button>
               )
             )}

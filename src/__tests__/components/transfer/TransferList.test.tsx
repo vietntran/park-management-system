@@ -5,6 +5,8 @@ import { addHours } from "date-fns";
 import { act } from "react";
 
 import TransferList from "@/components/transfer/TransferList";
+import { useLoadingStates } from "@/hooks/useLoadingStates";
+import { transferNotifications } from "@/lib/notifications";
 import type { Transfer } from "@/types/reservation";
 
 // Mock UI Components
@@ -16,9 +18,16 @@ jest.mock("@/components/ui/badge", () => ({
   )),
 }));
 
+// jest.mock("@/components/ui/button", () => ({
+//   Button: jest.fn(({ children, variant, onClick }) => (
+//     <button onClick={onClick} data-variant={variant}>
+//       {children}
+//     </button>
+//   )),
+// }));
 jest.mock("@/components/ui/button", () => ({
-  Button: jest.fn(({ children, variant, onClick }) => (
-    <button onClick={onClick} data-variant={variant}>
+  Button: jest.fn(({ children, variant, onClick, disabled }) => (
+    <button onClick={onClick} data-variant={variant} disabled={disabled}>
       {children}
     </button>
   )),
@@ -41,6 +50,31 @@ jest.mock("@/components/ui/card", () => ({
   CardDescription: jest.fn(({ children }) => (
     <div data-testid="card-description">{children}</div>
   )),
+}));
+
+jest.mock("@/hooks/useLoadingStates", () => ({
+  useLoadingStates: jest.fn(() => ({
+    loadingStates: { isSubmitting: false },
+    errors: {
+      datesError: null,
+      userReservationsError: null,
+      validationError: null,
+      submissionError: null,
+    },
+    setLoading: jest.fn(),
+    setError: jest.fn(),
+    clearErrors: jest.fn(),
+    clearError: jest.fn(),
+  })),
+}));
+
+jest.mock("@/lib/notifications", () => ({
+  transferNotifications: {
+    accepted: jest.fn(),
+    declined: jest.fn(),
+    created: jest.fn(),
+    actionError: jest.fn(),
+  },
 }));
 
 describe("TransferList", () => {
@@ -132,6 +166,10 @@ describe("TransferList", () => {
     jest.clearAllMocks();
   });
 
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
   describe("Rendering", () => {
     it("displays sent and received transfer sections correctly", () => {
       render(<TransferList {...defaultProps} />);
@@ -219,6 +257,28 @@ describe("TransferList", () => {
 
   describe("Interaction Handling", () => {
     it("calls onAcceptTransfer when accept button is clicked", async () => {
+      const mockSetLoading = jest.fn();
+      const mockUseLoadingStates = useLoadingStates as jest.MockedFunction<
+        typeof useLoadingStates
+      >;
+      mockUseLoadingStates.mockImplementation(() => ({
+        loadingStates: {
+          isSubmitting: false,
+          isLoadingDates: false,
+          isLoadingUserReservations: false,
+          isValidatingUsers: false,
+        },
+        errors: {
+          datesError: null,
+          userReservationsError: null,
+          validationError: null,
+          submissionError: null,
+        },
+        setLoading: mockSetLoading,
+        setError: jest.fn(),
+        clearErrors: jest.fn(),
+        clearError: jest.fn(),
+      }));
       const user = userEvent.setup();
       render(<TransferList {...defaultProps} />);
 
@@ -232,6 +292,26 @@ describe("TransferList", () => {
       });
 
       expect(defaultProps.onAcceptTransfer).toHaveBeenCalledWith("1");
+    });
+
+    it("calls onAcceptTransfer and handles loading state", async () => {
+      const mockSetLoading = jest.fn();
+      (useLoadingStates as jest.Mock).mockImplementation(() => ({
+        loadingStates: { isSubmitting: false },
+        setLoading: mockSetLoading,
+      }));
+
+      const user = userEvent.setup();
+      render(<TransferList {...defaultProps} />);
+
+      const acceptButton = screen.getByText("Accept");
+      await act(async () => {
+        await user.click(acceptButton);
+      });
+
+      expect(mockSetLoading).toHaveBeenCalledWith("isSubmitting", true);
+      expect(defaultProps.onAcceptTransfer).toHaveBeenCalledWith("1");
+      expect(mockSetLoading).toHaveBeenCalledWith("isSubmitting", false);
     });
 
     it("calls onDeclineTransfer when decline button is clicked", async () => {
@@ -323,6 +403,109 @@ describe("TransferList", () => {
 
       expect(statusBadges[0]).toHaveAttribute("data-variant", "secondary");
       expect(statusBadges[1]).toHaveAttribute("data-variant", "secondary");
+    });
+  });
+
+  describe("Loading States", () => {
+    it("disables buttons and shows loading state while submitting", async () => {
+      const mockUseLoadingStates = useLoadingStates as jest.MockedFunction<
+        typeof useLoadingStates
+      >;
+      mockUseLoadingStates.mockImplementation(() => ({
+        loadingStates: {
+          isSubmitting: true,
+          isLoadingDates: false,
+          isLoadingUserReservations: false,
+          isValidatingUsers: false,
+        },
+        errors: {
+          datesError: null,
+          userReservationsError: null,
+          validationError: null,
+          submissionError: null,
+        },
+        setLoading: jest.fn(),
+        setError: jest.fn(),
+        clearErrors: jest.fn(),
+        clearError: jest.fn(),
+      }));
+
+      render(<TransferList {...defaultProps} />);
+
+      const receivedSection = screen
+        .getByText("Received Transfers")
+        .closest("section");
+
+      const acceptButton = within(receivedSection!).getByText("Accepting...");
+      const declineButton = within(receivedSection!).getByText("Declining...");
+
+      expect(acceptButton).toBeDisabled();
+      expect(declineButton).toBeDisabled();
+      // Look for the Lucide loader icon class
+      expect(
+        screen.getByText("Accepting...").querySelector(".lucide-loader-circle"),
+      ).toBeInTheDocument();
+    });
+
+    it("shows toast notification on successful accept", async () => {
+      const mockUseLoadingStates = useLoadingStates as jest.MockedFunction<
+        typeof useLoadingStates
+      >;
+      mockUseLoadingStates.mockImplementation(() => ({
+        loadingStates: {
+          isSubmitting: false,
+          isLoadingDates: false,
+          isLoadingUserReservations: false,
+          isValidatingUsers: false,
+        },
+        errors: {
+          datesError: null,
+          userReservationsError: null,
+          validationError: null,
+          submissionError: null,
+        },
+        setLoading: jest.fn(),
+        setError: jest.fn(),
+        clearErrors: jest.fn(),
+        clearError: jest.fn(),
+      }));
+
+      const user = userEvent.setup();
+      render(<TransferList {...defaultProps} />);
+
+      const receivedSection = screen
+        .getByText("Received Transfers")
+        .closest("section");
+      const acceptButton = within(receivedSection!).getByRole("button", {
+        name: /Accept/i,
+      });
+
+      await act(async () => {
+        await user.click(acceptButton);
+      });
+
+      expect(transferNotifications.accepted).toHaveBeenCalled();
+    });
+
+    it("shows error toast on failed action", async () => {
+      const error = new Error("Network error");
+      const propsWithError = {
+        ...defaultProps,
+        onAcceptTransfer: jest.fn().mockRejectedValue(error),
+      };
+
+      const user = userEvent.setup();
+      render(<TransferList {...propsWithError} />);
+
+      const acceptButton = screen.getByText("Accept");
+      await act(async () => {
+        await user.click(acceptButton);
+      });
+
+      expect(transferNotifications.actionError).toHaveBeenCalledWith(
+        "accept",
+        "Network error",
+      );
     });
   });
 });
