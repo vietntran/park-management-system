@@ -17,6 +17,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { handleFormError } from "@/lib/errors/clientErrorHandler";
+import { transferNotifications } from "@/lib/notifications";
 import type {
   Reservation,
   TransferFormData,
@@ -45,7 +46,7 @@ export const TransferForm = ({
   onSubmit,
   onCancel,
 }: TransferFormProps) => {
-  const [error, setError] = useState<string | null>(null);
+  // const [error, setError] = useState<string | null>(null);
   const [isValidatingUsers, setIsValidatingUsers] = useState(false);
   const [selectedUserName, setSelectedUserName] = useState<string>("");
 
@@ -76,21 +77,24 @@ export const TransferForm = ({
           shouldValidate: true,
         });
         setSelectedUserName(selectedUser.name);
-        setError(null);
       }
     } catch (err) {
-      setError(handleFormError(err));
+      const errorMessage = handleFormError(err);
+      transferNotifications.validationError(errorMessage);
+      form.setError("toUserId", { message: errorMessage });
     } finally {
       setIsValidatingUsers(false);
     }
   };
 
   const handleFormSubmit = async (data: TransferFormData) => {
-    setError(null);
     try {
       await onSubmit(data);
+      transferNotifications.created();
     } catch (err) {
-      setError(handleFormError(err));
+      const errorMessage = handleFormError(err);
+      transferNotifications.creationError(errorMessage);
+      form.setError("root", { message: errorMessage });
     }
   };
 
@@ -233,9 +237,11 @@ export const TransferForm = ({
               />
             )}
 
-            {error && (
+            {form.formState.errors.root && (
               <Alert variant="error" role="alert">
-                <AlertDescription>{error}</AlertDescription>
+                <AlertDescription>
+                  {form.formState.errors.root.message}
+                </AlertDescription>
               </Alert>
             )}
 

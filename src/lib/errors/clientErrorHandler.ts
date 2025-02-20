@@ -11,12 +11,9 @@ interface ErrorContext {
   additionalInfo?: Record<string, unknown>;
 }
 
-export async function handleClientError(error: Error, context?: ErrorContext) {
-  // Show user-friendly error message
-  toast.error(error.message || "An unexpected error occurred");
-
+// For logging errors to the server
+async function logError(error: Error, context?: ErrorContext) {
   try {
-    // Send error to API endpoint for logging
     const response = await fetch("/api/error", {
       method: "POST",
       headers: {
@@ -40,23 +37,32 @@ export async function handleClientError(error: Error, context?: ErrorContext) {
   }
 }
 
+// For handling errors in regular client code (with toast)
+export async function handleClientError(error: Error, context?: ErrorContext) {
+  toast.error(error.message || "An unexpected error occurred");
+  await logError(error, context);
+}
+
+// For handling form errors (without toast)
 export function handleFormError(error: unknown): string {
   if (error instanceof Error) {
-    handleClientError(error, { path: window.location.pathname });
+    // Just log the error, don't show toast
+    logError(error, { path: window.location.pathname });
     return error.message;
   }
 
   const genericError = new Error("An unexpected error occurred");
-  handleClientError(genericError, { path: window.location.pathname });
+  logError(genericError, { path: window.location.pathname });
   return genericError.message;
 }
 
+// For handling API errors
 export async function handleApiError(response: Response): Promise<never> {
   const errorData = await response.json().catch(() => ({}));
   const errorMessage = errorData.error || `API Error: ${response.status}`;
   const error = new Error(errorMessage);
 
-  handleClientError(error, {
+  await handleClientError(error, {
     path: response.url,
     statusCode: response.status,
     method: "GET",
