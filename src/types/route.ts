@@ -4,7 +4,7 @@ import { type NextRequest } from "next/server";
 import type { ApiResponse } from "./api";
 
 export type RouteContext<T = Record<string, string>> = {
-  params: T;
+  params: Promise<T> | T;
 };
 
 export type ApiRouteHandler<T, P = Record<string, string>> = (

@@ -1,5 +1,9 @@
 // src/app/api/reservations/[id]/cancel/route.ts
-import { ReservationStatus, ReservationUserStatus } from "@prisma/client";
+import {
+  ReservationStatus,
+  ReservationUserStatus,
+  ReservationUser,
+} from "@prisma/client";
 import { type NextRequest } from "next/server";
 import { getServerSession } from "next-auth";
 import { z } from "zod";
@@ -33,7 +37,9 @@ export const POST = withErrorHandler<null>(
       throw new ValidationError("Reservation ID is required");
     }
 
-    const result = cancelParamsSchema.safeParse(context.params);
+    const params = await context.params;
+
+    const result = cancelParamsSchema.safeParse(params);
     if (!result.success) {
       logger.warn("Invalid reservation ID format", {
         requestId,
@@ -65,7 +71,7 @@ export const POST = withErrorHandler<null>(
 
     // Check if the user is part of this reservation
     const userReservation = reservation.reservationUsers.find(
-      (ru) => ru.userId === session.user.id,
+      (ru: ReservationUser) => ru.userId === session.user.id,
     );
 
     if (!userReservation) {
