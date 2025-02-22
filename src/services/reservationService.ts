@@ -61,4 +61,17 @@ export const reservationService = {
       body: JSON.stringify(data),
     });
   },
+
+  async getReservationById(
+    id: string,
+    signal?: AbortSignal,
+  ): Promise<ApiResponse<Reservation>> {
+    return typedFetch<Reservation>(`/api/reservations/${id}`, {
+      signal,
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+  },
 };
