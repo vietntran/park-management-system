@@ -1,4 +1,4 @@
-import { TransferStatus } from "@prisma/client";
+import { PrismaClient, TransferStatus } from "@prisma/client";
 import { type NextRequest } from "next/server";
 import { getServerSession } from "next-auth";
 import { z } from "zod";
@@ -33,6 +33,11 @@ export const GET = withErrorHandler(async () => {
   if (!session?.user?.id) {
     throw new AuthenticationError();
   }
+
+  // Define the type for the transfers result
+  type PrismaTransfer = Awaited<
+    ReturnType<typeof prisma.reservationTransfer.findMany>
+  >[number];
 
   const transfers = await prisma.reservationTransfer.findMany({
     where: {
@@ -71,16 +76,6 @@ export const GET = withErrorHandler(async () => {
           },
           dateCapacity: true,
         },
-        select: {
-          id: true,
-          primaryUserId: true,
-          reservationDate: true,
-          createdAt: true,
-          status: true,
-          canTransfer: true,
-          reservationUsers: true,
-          dateCapacity: true,
-        },
       },
     },
     orderBy: {
@@ -89,20 +84,22 @@ export const GET = withErrorHandler(async () => {
   });
 
   // Transform transfers to include remaining spots calculation
-  const transformedTransfers: Transfer[] = transfers.map((transfer) => ({
-    ...transfer,
-    reservation: transfer.reservation
-      ? {
-          ...transfer.reservation,
-          dateCapacity: {
-            totalBookings: transfer.reservation.dateCapacity.totalBookings,
-            remainingSpots:
-              RESERVATION_LIMITS.MAX_DAILY_RESERVATIONS -
-              transfer.reservation.dateCapacity.totalBookings,
-          },
-        }
-      : undefined,
-  }));
+  const transformedTransfers: Transfer[] = transfers.map(
+    (transfer: PrismaTransfer) => ({
+      ...transfer,
+      reservation: transfer.reservation
+        ? {
+            ...transfer.reservation,
+            dateCapacity: {
+              totalBookings: transfer.reservation.dateCapacity.totalBookings,
+              remainingSpots:
+                RESERVATION_LIMITS.MAX_DAILY_RESERVATIONS -
+                transfer.reservation.dateCapacity.totalBookings,
+            },
+          }
+        : undefined,
+    }),
+  );
 
   logger.info("Retrieved pending transfers", {
     userId: session.user.id,
@@ -128,7 +125,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     result.data;
 
   // Start transaction for transfer creation
-  const transfer = await prisma.$transaction(async (tx): Promise<Transfer> => {
+  const transfer = await prisma.$transaction(async (tx: PrismaClient) => {
     // Validate transfer using utility function
     await canInitiateTransfer({
       userId: session.user.id,
@@ -147,7 +144,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       throw new ValidationError("Reservation not found");
     }
 
-    // Create the transfer request
+    // Create the transfer request - FIX: Using only include, not both include and select
     const newTransfer = await tx.reservationTransfer.create({
       data: {
         reservationId,
@@ -187,26 +184,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
                   },
                 },
               },
-              select: {
-                reservationId: true,
-                userId: true,
-                isPrimary: true,
-                status: true,
-                addedAt: true,
-                cancelledAt: true,
-                user: true,
-              },
             },
-            dateCapacity: true,
-          },
-          select: {
-            id: true,
-            primaryUserId: true,
-            reservationDate: true,
-            createdAt: true,
-            status: true,
-            canTransfer: true,
-            reservationUsers: true,
             dateCapacity: true,
           },
         },

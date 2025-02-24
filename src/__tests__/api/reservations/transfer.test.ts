@@ -170,8 +170,20 @@ describe("POST /api/transfer", () => {
       },
     };
 
-    (prisma.reservationTransfer.create as jest.Mock).mockResolvedValueOnce(
-      mockTransfer,
+    // Enhanced mock that validates the query structure
+    (prisma.reservationTransfer.create as jest.Mock).mockImplementation(
+      (args) => {
+        // Check if the query has correct structure (no include and select on the same level)
+        if (
+          args.include?.reservation?.include &&
+          args.include?.reservation?.select
+        ) {
+          throw new Error(
+            "Please either use `include` or `select`, but not both at the same time.",
+          );
+        }
+        return mockTransfer;
+      },
     );
 
     const request = new Request("http://localhost:3000/api/transfers", {
@@ -193,7 +205,21 @@ describe("POST /api/transfer", () => {
         },
       },
     });
-    expect(prisma.reservationTransfer.create).toHaveBeenCalled();
+
+    // Verify the structure of the Prisma query
+    expect(prisma.reservationTransfer.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.any(Object),
+        include: expect.objectContaining({
+          fromUser: expect.any(Object),
+          toUser: expect.any(Object),
+          reservation: expect.objectContaining({
+            include: expect.any(Object),
+            // Should not have 'select' here
+          }),
+        }),
+      }),
+    );
   });
 
   test("returns 401 when user is not authenticated", async () => {
@@ -231,6 +257,57 @@ describe("POST /api/transfer", () => {
 
     expect(response.status).toBe(400);
     expect(data.error).toContain("Invalid uuid");
+  });
+
+  test("detects and fails on invalid Prisma query structure", async () => {
+    (
+      jest.requireMock("next-auth/next") as { getServerSession: jest.Mock }
+    ).getServerSession.mockResolvedValue({
+      user: { id: mockSession.user.id },
+    });
+
+    // First findUnique for validation
+    (prisma.reservation.findUnique as jest.Mock).mockResolvedValueOnce({
+      ...mockReservation,
+      reservationUsers: [
+        {
+          userId: mockSession.user.id,
+          status: ReservationUserStatus.ACTIVE,
+          isPrimary: true,
+          user: mockSession.user,
+        },
+      ],
+      transfers: [],
+    });
+
+    // Second findUnique for deadline calculation
+    (prisma.reservation.findUnique as jest.Mock).mockResolvedValueOnce({
+      ...mockReservation,
+    });
+
+    // Mock recipient find
+    (prisma.user.findUnique as jest.Mock).mockResolvedValueOnce({
+      ...mockRecipient,
+      reservationUsers: [],
+    });
+
+    // Mock the create function to throw a Prisma validation error
+    (prisma.reservationTransfer.create as jest.Mock).mockImplementation(() => {
+      throw new Error(
+        "Please either use `include` or `select`, but not both at the same time.",
+      );
+    });
+
+    const request = new Request("http://localhost:3000/api/transfers", {
+      method: "POST",
+      body: JSON.stringify(validTransferRequest),
+    }) as unknown as NextRequest;
+
+    const response = await act(async () => await POST(request));
+    const data = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(data.error).toBe("Internal server error");
   });
 
   test("returns 400 when reservation not found", async () => {
