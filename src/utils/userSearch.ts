@@ -1,5 +1,5 @@
 // src/utils/userSearch.ts
-import { handleClientError } from "@/lib/errors/clientErrorHandler";
+import { typedFetch } from "@/lib/utils";
 import type { SelectedUser } from "@/types/reservation";
 
 interface SearchResult {
@@ -17,35 +17,27 @@ export const searchUsers = async (
   }
 
   try {
-    const response = await fetch(
+    const response = await typedFetch<SearchResult[]>(
       `/api/users/search?q=${encodeURIComponent(query)}`,
     );
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || "Failed to search users");
+    if (!response.success) {
+      throw new Error(response.error);
     }
 
-    const data = await response.json();
-
     // Filter out already selected users
-    const filteredResults = data.filter(
-      (user: SearchResult) =>
-        !selectedUsers.some((selected) => selected.id === user.id),
+    const filteredResults = response.data.filter(
+      (user) => !selectedUsers.some((selected) => selected.id === user.id),
     );
 
     return { results: filteredResults, error: null };
   } catch (error) {
-    handleClientError(
-      error instanceof Error ? error : new Error("Failed to search users"),
-      {
-        path: "/api/users/search",
-        method: "GET",
-      },
-    );
+    const errorMessage =
+      error instanceof Error ? error.message : "Failed to search users";
+
     return {
       results: [],
-      error: error instanceof Error ? error.message : "Failed to search users",
+      error: errorMessage,
     };
   }
 };

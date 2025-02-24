@@ -1,9 +1,18 @@
+// src/__tests__/components/UserSearch.test.tsx
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { act } from "react";
 
 import { UserSearch } from "@/components/reservation/UserSearch";
 import type { SelectedUser } from "@/types/reservation";
+import { searchUsers } from "@/utils/userSearch";
+
+// Mock the searchUsers function
+jest.mock("@/utils/userSearch", () => ({
+  searchUsers: jest.fn(),
+}));
+
+const mockSearchUsers = searchUsers as jest.MockedFunction<typeof searchUsers>;
 
 // Mock UI components
 jest.mock("@/components/ui/Alert", () => ({
@@ -36,6 +45,7 @@ jest.mock("@/components/ui/command", () => ({
       placeholder={placeholder}
       value={value}
       onChange={(e) => onValueChange?.(e.target.value)}
+      data-testid="command-input"
     />
   )),
   CommandEmpty: jest.fn(({ children }) => <div>{children}</div>),
@@ -51,21 +61,6 @@ jest.mock("@/components/ui/popover", () => ({
   PopoverTrigger: jest.fn(({ children }) => <div>{children}</div>),
   PopoverContent: jest.fn(({ children }) => <div>{children}</div>),
 }));
-
-jest.mock("@/components/ui/switch", () => ({
-  Switch: jest.fn(({ id, checked, onCheckedChange }) => (
-    <input
-      type="checkbox"
-      id={id}
-      checked={checked}
-      onChange={(e) => onCheckedChange?.(e.target.checked)}
-    />
-  )),
-}));
-
-// Mock fetch globally
-const mockFetch = jest.fn();
-global.fetch = mockFetch;
 
 describe("UserSearch", () => {
   const mockUser: SelectedUser = {
@@ -83,9 +78,10 @@ describe("UserSearch", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve([mockUser]),
+    // Default mock implementation for searchUsers
+    mockSearchUsers.mockResolvedValue({
+      results: [mockUser],
+      error: null,
     });
   });
 
@@ -104,7 +100,12 @@ describe("UserSearch", () => {
   });
 
   it("shows 'Maximum users reached' when max users are selected", () => {
-    const selectedUsers = Array(3).fill(mockUser);
+    const selectedUsers = Array(3)
+      .fill(mockUser)
+      .map((user, index) => ({
+        ...user,
+        id: `user${index + 1}`, // Make user IDs unique
+      }));
     render(
       <UserSearch {...mockProps} selectedUsers={selectedUsers} maxUsers={3} />,
     );
@@ -124,15 +125,13 @@ describe("UserSearch", () => {
       );
     });
 
-    expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining("/api/users/search?q=John"),
-    );
+    expect(mockSearchUsers).toHaveBeenCalledWith("John", []);
   });
 
   it("handles failed search gracefully", async () => {
-    mockFetch.mockResolvedValue({
-      ok: false,
-      json: () => Promise.resolve({ error: "Search failed" }),
+    mockSearchUsers.mockResolvedValue({
+      results: [],
+      error: "Search failed",
     });
 
     render(<UserSearch {...mockProps} />);
@@ -183,8 +182,11 @@ describe("UserSearch", () => {
     expect(mockProps.onUserSelect).toHaveBeenCalledWith([]);
   });
 
-  it("handles search errors from the server", async () => {
-    mockFetch.mockRejectedValue(new Error("Network error"));
+  it("handles search errors", async () => {
+    mockSearchUsers.mockResolvedValue({
+      results: [],
+      error: "Network error",
+    });
 
     render(<UserSearch {...mockProps} />);
 
@@ -201,7 +203,7 @@ describe("UserSearch", () => {
         "data-variant",
         "error",
       );
-      expect(screen.getByText(/Network error/)).toBeInTheDocument();
+      expect(screen.getByText("Network error")).toBeInTheDocument();
     });
   });
 
@@ -243,10 +245,62 @@ describe("UserSearch", () => {
     expect(searchInput).toHaveValue("");
   });
 
-  it("disables search when isLoading is true", async () => {
+  it("disables search when isLoading is true", () => {
     render(<UserSearch {...mockProps} isLoading={true} />);
 
     const searchButton = screen.getByRole("combobox");
     expect(searchButton).toBeDisabled();
+  });
+
+  it("disables search when max users are selected", () => {
+    const selectedUsers = Array(3)
+      .fill(mockUser)
+      .map((user, index) => ({
+        ...user,
+        id: `user${index + 1}`, // Make user IDs unique
+      }));
+
+    render(
+      <UserSearch {...mockProps} selectedUsers={selectedUsers} maxUsers={3} />,
+    );
+
+    const searchButton = screen.getByRole("combobox");
+    expect(searchButton).toBeDisabled();
+  });
+
+  it("shows empty results message when no users are found", async () => {
+    mockSearchUsers.mockResolvedValue({
+      results: [],
+      error: null,
+    });
+
+    render(<UserSearch {...mockProps} />);
+
+    await act(async () => {
+      await userEvent.click(screen.getByRole("combobox"));
+      await userEvent.type(
+        screen.getByPlaceholderText("Search by name or email..."),
+        "NonExistent",
+      );
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("No users found")).toBeInTheDocument();
+    });
+  });
+
+  it("does not search when query is less than 2 characters", async () => {
+    render(<UserSearch {...mockProps} />);
+
+    await act(async () => {
+      await userEvent.click(screen.getByRole("combobox"));
+      await userEvent.type(
+        screen.getByPlaceholderText("Search by name or email..."),
+        "a",
+      );
+    });
+
+    // Search should not be triggered for a single character
+    expect(mockSearchUsers).toHaveBeenCalledWith("a", []);
   });
 });
