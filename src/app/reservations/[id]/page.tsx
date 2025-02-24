@@ -29,20 +29,23 @@ interface ReservationPageProps {
 export default async function ReservationPage({
   params,
 }: ReservationPageProps) {
+  // Await params to access its properties
+  const { id } = await params;
+
   const session = await getServerSession(authOptions);
 
   if (!session?.user?.id) {
     throw new AuthenticationError("Authentication required");
   }
 
-  if (!params.id || typeof params.id !== "string") {
+  if (!id || typeof id !== "string") {
     throw new ValidationError("Invalid reservation ID");
   }
 
   try {
     const reservation = await prisma.reservation.findUnique({
       where: {
-        id: params.id,
+        id: id,
         status: ReservationStatus.ACTIVE,
       },
       include: {
