@@ -41,9 +41,11 @@ export const UserSearch = ({
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
 
-  const handleSearch = async (query: string) => {
-    if (!query.trim()) {
+  const handleSearch = async () => {
+    const query = search.trim();
+    if (!query) {
       setSearchResults([]);
+      setSearchError(null);
       return;
     }
 
@@ -68,6 +70,13 @@ export const UserSearch = ({
   const handleRemoveUser = (userId: string) => {
     const updatedUsers = selectedUsers.filter((user) => user.id !== userId);
     onUserSelect(updatedUsers);
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleSearch();
+    }
   };
 
   return (
@@ -97,19 +106,30 @@ export const UserSearch = ({
             </AccordionTrigger>
             <AccordionContent className="px-4 pb-4">
               <div className="space-y-4">
-                {/* Search Input */}
-                <div className="relative">
-                  <Input
-                    placeholder="Search by name or email..."
-                    value={search}
-                    onChange={(e) => {
-                      setSearch(e.target.value);
-                      handleSearch(e.target.value);
-                    }}
-                    className="w-full pr-10"
-                    disabled={selectedUsers.length >= maxUsers || isLoading}
-                  />
-                  <Search className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                {/* Search Input with Button */}
+                <div className="flex space-x-2">
+                  <div className="relative flex-1">
+                    <Input
+                      placeholder="Search by name or email..."
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      onKeyDown={handleKeyPress}
+                      className="w-full"
+                      disabled={selectedUsers.length >= maxUsers || isLoading}
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    onClick={handleSearch}
+                    disabled={
+                      !search.trim() ||
+                      selectedUsers.length >= maxUsers ||
+                      isLoading
+                    }
+                  >
+                    <Search className="h-4 w-4 mr-2" />
+                    Search
+                  </Button>
                 </div>
 
                 {/* Loading State */}
@@ -160,11 +180,13 @@ export const UserSearch = ({
 
                 {/* No Results */}
                 {!isSearching &&
-                  search.trim() !== "" &&
                   searchResults.length === 0 &&
-                  !searchError && (
+                  searchError === null &&
+                  searchResults.length === 0 && (
                     <div className="text-center py-2 text-sm text-muted-foreground">
-                      No users found
+                      {search.trim()
+                        ? "No users found"
+                        : "Enter a search term and click Search"}
                     </div>
                   )}
               </div>

@@ -25,8 +25,10 @@ jest.mock("@/components/ui/Alert", () => ({
 }));
 
 jest.mock("@/components/ui/button", () => ({
-  Button: jest.fn(({ children, ...props }) => (
-    <button {...props}>{children}</button>
+  Button: jest.fn(({ children, onClick, disabled, ...props }) => (
+    <button onClick={onClick} disabled={disabled} {...props}>
+      {children}
+    </button>
   )),
 }));
 
@@ -37,16 +39,19 @@ jest.mock("@/components/ui/card", () => ({
 }));
 
 jest.mock("@/components/ui/input", () => ({
-  Input: jest.fn(({ placeholder, value, onChange, className, disabled }) => (
-    <input
-      placeholder={placeholder}
-      value={value}
-      onChange={onChange}
-      className={className}
-      disabled={disabled}
-      data-testid="search-input"
-    />
-  )),
+  Input: jest.fn(
+    ({ placeholder, value, onChange, onKeyDown, className, disabled }) => (
+      <input
+        placeholder={placeholder}
+        value={value}
+        onChange={onChange}
+        onKeyDown={onKeyDown}
+        className={className}
+        disabled={disabled}
+        data-testid="search-input"
+      />
+    ),
+  ),
 }));
 
 // Mock accordion components
@@ -131,7 +136,7 @@ describe("UserSearch", () => {
     );
   });
 
-  it("searches users when query is entered", async () => {
+  it("searches users when search button is clicked", async () => {
     render(<UserSearch {...mockProps} />);
 
     // Toggle accordion open
@@ -139,11 +144,81 @@ describe("UserSearch", () => {
       await userEvent.click(screen.getByTestId("accordion-value-change"));
     });
 
+    // Type in search field
     await act(async () => {
       await userEvent.type(screen.getByTestId("search-input"), "John");
     });
 
+    // Click the search button using a precise name match
+    await act(async () => {
+      await userEvent.click(screen.getByRole("button", { name: /^Search$/i }));
+    });
+
     expect(mockSearchUsers).toHaveBeenCalledWith("John", []);
+  });
+
+  it("searches users when Enter key is pressed", async () => {
+    render(<UserSearch {...mockProps} />);
+
+    // Toggle accordion open
+    await act(async () => {
+      await userEvent.click(screen.getByTestId("accordion-value-change"));
+    });
+
+    // Type in search field and press Enter
+    const searchInput = screen.getByTestId("search-input");
+    await act(async () => {
+      await userEvent.type(searchInput, "John");
+      await userEvent.keyboard("{Enter}");
+    });
+
+    expect(mockSearchUsers).toHaveBeenCalledWith("John", []);
+  });
+
+  it("does not search when input changes without pressing search button", async () => {
+    render(<UserSearch {...mockProps} />);
+
+    // Toggle accordion open
+    await act(async () => {
+      await userEvent.click(screen.getByTestId("accordion-value-change"));
+    });
+
+    // Type in search field without clicking search
+    await act(async () => {
+      await userEvent.type(screen.getByTestId("search-input"), "John");
+    });
+
+    // The search function should not be called
+    expect(mockSearchUsers).not.toHaveBeenCalled();
+  });
+
+  it("disables search button when input is empty", async () => {
+    render(<UserSearch {...mockProps} />);
+
+    // Toggle accordion open
+    await act(async () => {
+      await userEvent.click(screen.getByTestId("accordion-value-change"));
+    });
+
+    const searchButton = screen.getByRole("button", { name: /^Search$/i });
+    expect(searchButton).toBeDisabled();
+  });
+
+  it("enables search button when input has text", async () => {
+    render(<UserSearch {...mockProps} />);
+
+    // Toggle accordion open
+    await act(async () => {
+      await userEvent.click(screen.getByTestId("accordion-value-change"));
+    });
+
+    // Type in search field
+    await act(async () => {
+      await userEvent.type(screen.getByTestId("search-input"), "John");
+    });
+
+    const searchButton = screen.getByRole("button", { name: /^Search$/i });
+    expect(searchButton).not.toBeDisabled();
   });
 
   it("handles failed search gracefully", async () => {
@@ -159,8 +234,10 @@ describe("UserSearch", () => {
       await userEvent.click(screen.getByTestId("accordion-value-change"));
     });
 
+    // Type and search
     await act(async () => {
       await userEvent.type(screen.getByTestId("search-input"), "John");
+      await userEvent.click(screen.getByRole("button", { name: /^Search$/i }));
     });
 
     await waitFor(() => {
@@ -176,8 +253,10 @@ describe("UserSearch", () => {
       await userEvent.click(screen.getByTestId("accordion-value-change"));
     });
 
+    // Type and search
     await act(async () => {
       await userEvent.type(screen.getByTestId("search-input"), "John");
+      await userEvent.click(screen.getByRole("button", { name: /^Search$/i }));
     });
 
     await waitFor(() => {
@@ -215,8 +294,10 @@ describe("UserSearch", () => {
       await userEvent.click(screen.getByTestId("accordion-value-change"));
     });
 
+    // Type and search
     await act(async () => {
       await userEvent.type(screen.getByTestId("search-input"), "John");
+      await userEvent.click(screen.getByRole("button", { name: /^Search$/i }));
     });
 
     await waitFor(() => {
@@ -247,6 +328,7 @@ describe("UserSearch", () => {
     const searchInput = screen.getByTestId("search-input");
     await act(async () => {
       await userEvent.type(searchInput, "John");
+      await userEvent.click(screen.getByRole("button", { name: /^Search$/i }));
     });
 
     // Wait for and select user
@@ -273,7 +355,10 @@ describe("UserSearch", () => {
     });
 
     const searchInput = screen.getByTestId("search-input");
+    const searchButton = screen.getByRole("button", { name: /^Search$/i });
+
     expect(searchInput).toBeDisabled();
+    expect(searchButton).toBeDisabled();
   });
 
   it("disables search when max users are selected", () => {
@@ -294,7 +379,10 @@ describe("UserSearch", () => {
     });
 
     const searchInput = screen.getByTestId("search-input");
+    const searchButton = screen.getByRole("button", { name: /search/i });
+
     expect(searchInput).toBeDisabled();
+    expect(searchButton).toBeDisabled();
   });
 
   it("shows empty results message when no users are found", async () => {
@@ -310,12 +398,28 @@ describe("UserSearch", () => {
       await userEvent.click(screen.getByTestId("accordion-value-change"));
     });
 
+    // Type and search
     await act(async () => {
       await userEvent.type(screen.getByTestId("search-input"), "NonExistent");
+      await userEvent.click(screen.getByRole("button", { name: /^Search$/i }));
     });
 
     await waitFor(() => {
       expect(screen.getByText("No users found")).toBeInTheDocument();
     });
+  });
+
+  it("shows guidance message when no search has been performed", async () => {
+    render(<UserSearch {...mockProps} />);
+
+    // Toggle accordion open
+    await act(async () => {
+      await userEvent.click(screen.getByTestId("accordion-value-change"));
+    });
+
+    // Check for guidance message
+    expect(
+      screen.getByText("Enter a search term and click Search"),
+    ).toBeInTheDocument();
   });
 });
