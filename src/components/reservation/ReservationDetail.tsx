@@ -9,7 +9,8 @@ import { TransferForm } from "@/components/transfer/TransferForm";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Reservation } from "@/types/reservation";
+import { transferService } from "@/services/transferService";
+import { Reservation, TransferFormData } from "@/types/reservation";
 
 import { CancellationDialog } from "./CancellationDialog";
 
@@ -32,6 +33,17 @@ export function ReservationDetail({
   if (!currentUserReservation) {
     return null;
   }
+
+  const handleTransferSubmit = async (data: TransferFormData) => {
+    // Call the transfer service to create a transfer
+    await transferService.createTransfer(data);
+
+    // Close the form after successful submission
+    setShowTransferForm(false);
+
+    // Redirect to reservations page
+    window.location.href = "/reservations";
+  };
 
   return (
     <div className="space-y-6">
@@ -136,11 +148,7 @@ export function ReservationDetail({
         <TransferForm
           reservation={reservation}
           onCancel={() => setShowTransferForm(false)}
-          onSubmit={async () => {
-            setShowTransferForm(false);
-            // After successful transfer redirect to reservations page
-            window.location.href = "/reservations";
-          }}
+          onSubmit={handleTransferSubmit}
         />
       )}
     </div>
