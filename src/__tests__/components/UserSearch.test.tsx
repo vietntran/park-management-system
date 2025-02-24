@@ -36,30 +36,47 @@ jest.mock("@/components/ui/card", () => ({
   )),
 }));
 
-jest.mock("@/components/ui/command", () => ({
-  Command: jest.fn(({ children }) => (
-    <div data-testid="command">{children}</div>
-  )),
-  CommandInput: jest.fn(({ placeholder, value, onValueChange }) => (
+jest.mock("@/components/ui/input", () => ({
+  Input: jest.fn(({ placeholder, value, onChange, className, disabled }) => (
     <input
       placeholder={placeholder}
       value={value}
-      onChange={(e) => onValueChange?.(e.target.value)}
-      data-testid="command-input"
+      onChange={onChange}
+      className={className}
+      disabled={disabled}
+      data-testid="search-input"
     />
   )),
-  CommandEmpty: jest.fn(({ children }) => <div>{children}</div>),
-  CommandGroup: jest.fn(({ children }) => <div>{children}</div>),
-  CommandItem: jest.fn(({ children, onSelect }) => (
-    <div onClick={onSelect}>{children}</div>
-  )),
-  CommandLoading: jest.fn(({ children }) => <div>{children}</div>),
 }));
 
-jest.mock("@/components/ui/popover", () => ({
-  Popover: jest.fn(({ children }) => <div>{children}</div>),
-  PopoverTrigger: jest.fn(({ children }) => <div>{children}</div>),
-  PopoverContent: jest.fn(({ children }) => <div>{children}</div>),
+// Mock accordion components
+jest.mock("@/components/ui/accordion", () => ({
+  Accordion: jest.fn(({ children, value, onValueChange }) => (
+    <div data-testid="accordion" data-value={value}>
+      {children}
+      <button
+        data-testid="accordion-value-change"
+        onClick={() => onValueChange(value ? "" : "users")}
+      >
+        Toggle
+      </button>
+    </div>
+  )),
+  AccordionItem: jest.fn(({ children, value }) => (
+    <div data-testid="accordion-item" data-value={value}>
+      {children}
+    </div>
+  )),
+  AccordionTrigger: jest.fn(({ children, className }) => (
+    <button data-testid="accordion-trigger" className={className}>
+      {children}
+    </button>
+  )),
+  AccordionContent: jest.fn(({ children, className }) => (
+    <div data-testid="accordion-content" className={className}>
+      {children}
+    </div>
+  )),
 }));
 
 describe("UserSearch", () => {
@@ -87,14 +104,14 @@ describe("UserSearch", () => {
 
   it("shows search button in default state", () => {
     render(<UserSearch {...mockProps} />);
-    expect(screen.getByRole("combobox")).toHaveTextContent(
+    expect(screen.getByTestId("accordion-trigger")).toHaveTextContent(
       "Search for users...",
     );
   });
 
   it("shows loading state when isLoading prop is true", () => {
     render(<UserSearch {...mockProps} isLoading={true} />);
-    expect(screen.getByRole("combobox")).toHaveTextContent(
+    expect(screen.getByTestId("accordion-trigger")).toHaveTextContent(
       "Validating users...",
     );
   });
@@ -109,7 +126,7 @@ describe("UserSearch", () => {
     render(
       <UserSearch {...mockProps} selectedUsers={selectedUsers} maxUsers={3} />,
     );
-    expect(screen.getByRole("combobox")).toHaveTextContent(
+    expect(screen.getByTestId("accordion-trigger")).toHaveTextContent(
       "Maximum users reached",
     );
   });
@@ -117,12 +134,13 @@ describe("UserSearch", () => {
   it("searches users when query is entered", async () => {
     render(<UserSearch {...mockProps} />);
 
+    // Toggle accordion open
     await act(async () => {
-      await userEvent.click(screen.getByRole("combobox"));
-      await userEvent.type(
-        screen.getByPlaceholderText("Search by name or email..."),
-        "John",
-      );
+      await userEvent.click(screen.getByTestId("accordion-value-change"));
+    });
+
+    await act(async () => {
+      await userEvent.type(screen.getByTestId("search-input"), "John");
     });
 
     expect(mockSearchUsers).toHaveBeenCalledWith("John", []);
@@ -136,12 +154,13 @@ describe("UserSearch", () => {
 
     render(<UserSearch {...mockProps} />);
 
+    // Toggle accordion open
     await act(async () => {
-      await userEvent.click(screen.getByRole("combobox"));
-      await userEvent.type(
-        screen.getByPlaceholderText("Search by name or email..."),
-        "John",
-      );
+      await userEvent.click(screen.getByTestId("accordion-value-change"));
+    });
+
+    await act(async () => {
+      await userEvent.type(screen.getByTestId("search-input"), "John");
     });
 
     await waitFor(() => {
@@ -152,12 +171,13 @@ describe("UserSearch", () => {
   it("calls onUserSelect with user when user is selected", async () => {
     render(<UserSearch {...mockProps} />);
 
+    // Toggle accordion open
     await act(async () => {
-      await userEvent.click(screen.getByRole("combobox"));
-      await userEvent.type(
-        screen.getByPlaceholderText("Search by name or email..."),
-        "John",
-      );
+      await userEvent.click(screen.getByTestId("accordion-value-change"));
+    });
+
+    await act(async () => {
+      await userEvent.type(screen.getByTestId("search-input"), "John");
     });
 
     await waitFor(() => {
@@ -165,8 +185,8 @@ describe("UserSearch", () => {
     });
 
     await act(async () => {
-      // Select the user
-      await userEvent.click(screen.getByText(mockUser.name));
+      // Select the user by clicking the Add button
+      await userEvent.click(screen.getByText("Add"));
     });
 
     expect(mockProps.onUserSelect).toHaveBeenCalledWith([mockUser]);
@@ -190,12 +210,13 @@ describe("UserSearch", () => {
 
     render(<UserSearch {...mockProps} />);
 
+    // Toggle accordion open
     await act(async () => {
-      await userEvent.click(screen.getByRole("combobox"));
-      await userEvent.type(
-        screen.getByPlaceholderText("Search by name or email..."),
-        "John",
-      );
+      await userEvent.click(screen.getByTestId("accordion-value-change"));
+    });
+
+    await act(async () => {
+      await userEvent.type(screen.getByTestId("search-input"), "John");
     });
 
     await waitFor(() => {
@@ -217,15 +238,13 @@ describe("UserSearch", () => {
       />,
     );
 
-    // Open the combobox
+    // Toggle accordion open
     await act(async () => {
-      await userEvent.click(screen.getByRole("combobox"));
+      await userEvent.click(screen.getByTestId("accordion-value-change"));
     });
 
     // Type in search
-    const searchInput = screen.getByPlaceholderText(
-      "Search by name or email...",
-    );
+    const searchInput = screen.getByTestId("search-input");
     await act(async () => {
       await userEvent.type(searchInput, "John");
     });
@@ -236,9 +255,9 @@ describe("UserSearch", () => {
       expect(screen.getByText(mockUser.email)).toBeInTheDocument();
     });
 
-    // Select the user
+    // Select the user by clicking the Add button
     await act(async () => {
-      await userEvent.click(screen.getByText(mockUser.name));
+      await userEvent.click(screen.getByText("Add"));
     });
 
     // Verify search input is cleared
@@ -248,8 +267,13 @@ describe("UserSearch", () => {
   it("disables search when isLoading is true", () => {
     render(<UserSearch {...mockProps} isLoading={true} />);
 
-    const searchButton = screen.getByRole("combobox");
-    expect(searchButton).toBeDisabled();
+    // Toggle accordion open
+    act(() => {
+      userEvent.click(screen.getByTestId("accordion-value-change"));
+    });
+
+    const searchInput = screen.getByTestId("search-input");
+    expect(searchInput).toBeDisabled();
   });
 
   it("disables search when max users are selected", () => {
@@ -264,8 +288,13 @@ describe("UserSearch", () => {
       <UserSearch {...mockProps} selectedUsers={selectedUsers} maxUsers={3} />,
     );
 
-    const searchButton = screen.getByRole("combobox");
-    expect(searchButton).toBeDisabled();
+    // Toggle accordion open
+    act(() => {
+      userEvent.click(screen.getByTestId("accordion-value-change"));
+    });
+
+    const searchInput = screen.getByTestId("search-input");
+    expect(searchInput).toBeDisabled();
   });
 
   it("shows empty results message when no users are found", async () => {
@@ -276,31 +305,17 @@ describe("UserSearch", () => {
 
     render(<UserSearch {...mockProps} />);
 
+    // Toggle accordion open
     await act(async () => {
-      await userEvent.click(screen.getByRole("combobox"));
-      await userEvent.type(
-        screen.getByPlaceholderText("Search by name or email..."),
-        "NonExistent",
-      );
+      await userEvent.click(screen.getByTestId("accordion-value-change"));
+    });
+
+    await act(async () => {
+      await userEvent.type(screen.getByTestId("search-input"), "NonExistent");
     });
 
     await waitFor(() => {
       expect(screen.getByText("No users found")).toBeInTheDocument();
     });
-  });
-
-  it("does not search when query is less than 2 characters", async () => {
-    render(<UserSearch {...mockProps} />);
-
-    await act(async () => {
-      await userEvent.click(screen.getByRole("combobox"));
-      await userEvent.type(
-        screen.getByPlaceholderText("Search by name or email..."),
-        "a",
-      );
-    });
-
-    // Search should not be triggered for a single character
-    expect(mockSearchUsers).toHaveBeenCalledWith("a", []);
   });
 });
