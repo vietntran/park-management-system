@@ -6,12 +6,13 @@ const generateSequentialUuid = (sequence: number): string => {
 };
 
 export const TEST_UUIDS = {
-  // Users - Following the 4 users per reservation limit
+  // Users - Following the 4 users per reservation limit, plus a test user for validation testing
   USERS: {
     PRIMARY: generateSequentialUuid(1),
     SECOND: generateSequentialUuid(2),
     THIRD: generateSequentialUuid(3),
     FOURTH: generateSequentialUuid(4),
+    FIFTH: generateSequentialUuid(18), // Added for validation tests
   },
 
   // Addresses - One per user
@@ -20,6 +21,7 @@ export const TEST_UUIDS = {
     SECOND: generateSequentialUuid(6),
     THIRD: generateSequentialUuid(7),
     FOURTH: generateSequentialUuid(8),
+    FIFTH: generateSequentialUuid(19), // Added for validation tests
   },
 
   // Reservations - For testing consecutive dates limit (3) and multiple scenarios
