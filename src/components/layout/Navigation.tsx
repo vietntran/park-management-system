@@ -23,6 +23,7 @@ const Navigation = () => {
   const authNavigation = [
     { name: "Home", href: "/" },
     { name: "Reservations", href: "/reservations" },
+    { name: "Transfers", href: "/transfers" },
   ];
 
   const publicNavigation = [
