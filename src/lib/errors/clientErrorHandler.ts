@@ -11,19 +11,39 @@ interface ErrorContext {
   additionalInfo?: Record<string, unknown>;
 }
 
+interface ErrorLogPayload {
+  message: string;
+  path?: string;
+  method?: string;
+  statusCode?: number;
+  userId?: string;
+  additionalInfo?: Record<string, unknown>;
+  timestamp: string;
+}
+
 // For logging errors to the server
 async function logError(error: Error, context?: ErrorContext) {
   try {
+    const payload: ErrorLogPayload = {
+      message: error.message,
+      timestamp: new Date().toISOString(),
+    };
+
+    if (context) {
+      if (context.path) payload.path = context.path;
+      if (context.method) payload.method = context.method;
+      if (context.statusCode) payload.statusCode = context.statusCode;
+      if (context.userId) payload.userId = context.userId;
+      if (context.additionalInfo)
+        payload.additionalInfo = context.additionalInfo;
+    }
+
     const response = await fetch("/api/error", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        message: error.message,
-        ...context,
-        timestamp: new Date().toISOString(),
-      }),
+      body: JSON.stringify(payload),
     });
 
     if (!response.ok) {
@@ -31,8 +51,9 @@ async function logError(error: Error, context?: ErrorContext) {
     }
   } catch (loggingError) {
     console.error("Error logging failed:", {
-      originalError: error,
-      loggingError,
+      originalError: error.message,
+      loggingError:
+        loggingError instanceof Error ? loggingError.message : "Unknown error",
     });
   }
 }
