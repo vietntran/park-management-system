@@ -245,17 +245,19 @@ export const TransferForm = ({
               </Alert>
             )}
 
-            <div className="flex justify-end space-x-4">
-              <Button type="button" variant="outline" onClick={onCancel}>
-                Cancel
-              </Button>
+            <div className="flex justify-end">
               <Button
                 type="submit"
                 disabled={form.formState.isSubmitting || isValidatingUsers}
+                className="mr-4"
+                style={{ marginRight: "16px" }}
               >
                 {form.formState.isSubmitting
                   ? "Creating Transfer..."
                   : "Create Transfer"}
+              </Button>
+              <Button type="button" variant="outline" onClick={onCancel}>
+                Cancel
               </Button>
             </div>
           </form>

@@ -2,7 +2,6 @@
 
 import { format } from "date-fns";
 import { Pencil, Trash2, UserMinus } from "lucide-react";
-import Link from "next/link";
 import { useState } from "react";
 
 import { TransferForm } from "@/components/transfer/TransferForm";
@@ -107,7 +106,19 @@ export function ReservationDetail({
         </CardContent>
       </Card>
 
-      <div className="flex flex-col sm:flex-row gap-4">
+      <div className="flex flex-row gap-4">
+        {currentUserReservation.isPrimary && reservation.canTransfer && (
+          <Button
+            variant={showTransferForm ? "default" : "outline"}
+            onClick={() => setShowTransferForm(!showTransferForm)}
+            className="flex items-center"
+            style={{ marginRight: "16px" }}
+          >
+            <Pencil className="mr-2 h-4 w-4" />
+            Transfer Ownership
+          </Button>
+        )}
+
         <Button
           variant="destructive"
           onClick={() => setShowCancellationDialog(true)}
@@ -115,21 +126,6 @@ export function ReservationDetail({
         >
           <Trash2 className="mr-2 h-4 w-4" />
           Cancel Reservation
-        </Button>
-
-        {currentUserReservation.isPrimary && reservation.canTransfer && (
-          <Button
-            variant="outline"
-            onClick={() => setShowTransferForm(true)}
-            className="flex items-center"
-          >
-            <Pencil className="mr-2 h-4 w-4" />
-            Transfer Ownership
-          </Button>
-        )}
-
-        <Button variant="outline" asChild>
-          <Link href="/reservations">Back to Reservations</Link>
         </Button>
       </div>
 

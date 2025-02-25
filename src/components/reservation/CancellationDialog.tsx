@@ -69,18 +69,19 @@ export function CancellationDialog({
             undone.
           </AlertDialogDescription>
         </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel disabled={isLoading}>Cancel</AlertDialogCancel>
+        <AlertDialogFooter className="flex justify-end gap-0">
           <AlertDialogAction
             onClick={handleCancellation}
-            className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            className="bg-red-600 hover:bg-red-700 focus:ring-red-600 mr-4"
             disabled={isLoading}
+            style={{ marginRight: "16px" }}
           >
             {isLoading ? (
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
             ) : null}
             Confirm Cancellation
           </AlertDialogAction>
+          <AlertDialogCancel disabled={isLoading}>Cancel</AlertDialogCancel>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
