@@ -1,4 +1,4 @@
-import { ReservationStatus } from "@prisma/client";
+import { ReservationStatus, ReservationUserStatus } from "@prisma/client";
 import { format } from "date-fns";
 import { PlusIcon, Users, ChevronRight } from "lucide-react";
 import { Metadata } from "next";
@@ -45,6 +45,7 @@ export default async function ReservationsPage() {
           reservationUsers: {
             some: {
               userId: session.user.id,
+              status: ReservationUserStatus.ACTIVE,
             },
           },
         },
@@ -53,6 +54,9 @@ export default async function ReservationsPage() {
     },
     include: {
       reservationUsers: {
+        where: {
+          status: ReservationUserStatus.ACTIVE,
+        },
         include: {
           user: {
             select: {

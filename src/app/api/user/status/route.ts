@@ -51,8 +51,39 @@ export const GET = withErrorHandler<UserStatus>(async () => {
           id: true,
           reservationDate: true,
           reservationUsers: {
+            where: {
+              status: "ACTIVE", // Only include ACTIVE reservation users
+            },
             select: {
               userId: true,
+            },
+          },
+        },
+      },
+      // Add this to also include reservations where the user is a member but not the primary
+      reservationUsers: {
+        where: {
+          status: "ACTIVE",
+          reservation: {
+            reservationDate: {
+              gte: new Date(),
+            },
+            status: "ACTIVE",
+          },
+        },
+        include: {
+          reservation: {
+            select: {
+              id: true,
+              reservationDate: true,
+              reservationUsers: {
+                where: {
+                  status: "ACTIVE",
+                },
+                select: {
+                  userId: true,
+                },
+              },
             },
           },
         },
@@ -76,11 +107,28 @@ export const GET = withErrorHandler<UserStatus>(async () => {
     24;
 
   // Transform reservations to include guest count
-  const upcomingReservations = user.primaryReservations.map((reservation) => ({
+  // Get primary reservations
+  const primaryReservations = user.primaryReservations.map((reservation) => ({
     id: reservation.id,
     startDate: reservation.reservationDate,
     guestCount: reservation.reservationUsers.length,
   }));
+
+  // Get member reservations (where user is not primary)
+  const memberReservations = user.reservationUsers
+    .filter(
+      (ru) =>
+        ru.reservation.id &&
+        !user.primaryReservations.some((pr) => pr.id === ru.reservation.id),
+    )
+    .map((ru) => ({
+      id: ru.reservation.id,
+      startDate: ru.reservation.reservationDate,
+      guestCount: ru.reservation.reservationUsers.length,
+    }));
+
+  // Combine both types of reservations
+  const upcomingReservations = [...primaryReservations, ...memberReservations];
 
   logger.info("User status retrieved successfully", {
     requestId,

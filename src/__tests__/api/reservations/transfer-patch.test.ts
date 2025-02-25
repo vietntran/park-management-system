@@ -33,6 +33,7 @@ jest.mock("@/lib/prisma", () => ({
     reservationUser: {
       update: jest.fn(),
       create: jest.fn(),
+      findUnique: jest.fn(),
     },
     reservation: {
       update: jest.fn(),
@@ -125,6 +126,8 @@ describe("PATCH /api/reservations/transfer/:id", () => {
     ).getServerSession.mockResolvedValue({
       user: { id: mockSession.user.id },
     });
+
+    (prisma.reservationUser.findUnique as jest.Mock).mockResolvedValue(null);
 
     // Mock findUnique to return a valid transfer
     (prisma.reservationTransfer.findUnique as jest.Mock).mockResolvedValue(

@@ -128,19 +128,42 @@ export const PATCH = withErrorHandler(
             ),
           );
 
-          // Create new reservation users for recipient
-          await Promise.all(
-            transfer.spotsToTransfer.map((userId) =>
-              tx.reservationUser.create({
-                data: {
+          // Check if user already has an entry in this reservation
+          const existingReservationUser = await tx.reservationUser.findUnique({
+            where: {
+              reservationId_userId: {
+                reservationId: transfer.reservationId,
+                userId: transfer.toUserId,
+              },
+            },
+          });
+
+          if (existingReservationUser) {
+            // If the user already has an entry, update it
+            await tx.reservationUser.update({
+              where: {
+                reservationId_userId: {
                   reservationId: transfer.reservationId,
                   userId: transfer.toUserId,
-                  isPrimary: userId === transfer.reservation.primaryUserId,
-                  status: ReservationUserStatus.ACTIVE,
                 },
-              }),
-            ),
-          );
+              },
+              data: {
+                isPrimary: transfer.isPrimaryTransfer,
+                status: ReservationUserStatus.ACTIVE,
+                cancelledAt: null,
+              },
+            });
+          } else {
+            // If the user doesn't have an entry yet, create one
+            await tx.reservationUser.create({
+              data: {
+                reservationId: transfer.reservationId,
+                userId: transfer.toUserId,
+                isPrimary: transfer.isPrimaryTransfer,
+                status: ReservationUserStatus.ACTIVE,
+              },
+            });
+          }
 
           // If this was a primary transfer, update the reservation's primaryUserId
           if (transfer.isPrimaryTransfer) {
