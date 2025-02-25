@@ -1,5 +1,4 @@
 // src/components/dashboard/DashboardHeader.tsx
-import { SignOutButton } from "@/components/auth/SignOutButton";
 
 export function DashboardHeader() {
   return (
@@ -10,7 +9,7 @@ export function DashboardHeader() {
             <h1 className="text-xl font-semibold">Park Management System</h1>
           </div>
           <nav className="flex items-center space-x-4">
-            <SignOutButton />
+            {/* You can add other dashboard-specific actions here if needed */}
           </nav>
         </div>
       </div>
