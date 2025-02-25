@@ -23,9 +23,18 @@ const updateTransferSchema = z.object({
   action: z.enum(["accept", "decline"]),
 });
 
-export const PATCH = withErrorHandler(
+export const PATCH = withErrorHandler<Transfer>(
   async (req: NextRequest, context?: RouteContext) => {
-    if (!context?.params?.id) {
+    // Type guard for context and params
+    if (!context || !context.params) {
+      throw new ValidationError("Missing context or params");
+    }
+
+    // Type assertion after validation
+    const params = await Promise.resolve(context.params);
+    const transferId = params.id as string;
+
+    if (!transferId) {
       throw new ValidationError("Missing transfer ID");
     }
 
@@ -41,11 +50,10 @@ export const PATCH = withErrorHandler(
     }
 
     const { action } = result.data;
-    const transferId = context.params.id;
 
     // Start transaction for transfer update
     const updatedTransfer = await prisma.$transaction(
-      async (tx): Promise<Transfer> => {
+      async (tx: typeof prisma) => {
         // Check if user can accept transfer
         if (action === "accept") {
           await canAcceptTransfer({
@@ -112,7 +120,7 @@ export const PATCH = withErrorHandler(
         if (action === "accept") {
           // Update reservation users status to CANCELLED (since TRANSFERRED doesn't exist)
           await Promise.all(
-            transfer.spotsToTransfer.map((userId) =>
+            transfer.spotsToTransfer.map((userId: string) =>
               tx.reservationUser.update({
                 where: {
                   reservationId_userId: {
