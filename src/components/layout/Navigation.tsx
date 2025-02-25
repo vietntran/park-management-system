@@ -6,7 +6,6 @@ import { useSession } from "next-auth/react";
 
 import { SignOutButton } from "@/components/auth/SignOutButton";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 
 const Navigation = () => {
   const pathname = usePathname();
@@ -14,87 +13,124 @@ const Navigation = () => {
   const isAuthenticated = status === "authenticated";
   const isProfileComplete = session?.user?.isProfileComplete;
 
-  return (
-    <nav className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-16 items-center">
-        {/* Brand - Home Link */}
-        <div className="flex-1 flex items-center">
-          <Link href="/" className="font-bold text-lg mr-8">
-            Park Management
-          </Link>
+  // Style for active vs inactive links - with increased font size
+  const getLinkStyle = (path: string) => {
+    const baseStyle = {
+      fontSize: "1rem", // Increased from 0.875rem to 1rem
+      fontWeight: 500,
+      padding: "0.5rem 1rem",
+      margin: "0 1rem",
+      transition: "color 0.2s",
+      display: "inline-block",
+    };
 
-          {/* Conditional Nav Links */}
-          <div className="flex items-center space-x-6">
-            {isAuthenticated && (
-              <>
-                {isProfileComplete && (
-                  <>
-                    <Link
-                      href="/reservations"
-                      className={cn(
-                        "text-sm font-medium transition-colors hover:text-foreground/80",
-                        pathname === "/reservations"
-                          ? "text-foreground"
-                          : "text-foreground/60",
-                      )}
-                    >
-                      Reservations
-                    </Link>
-                    <Link
-                      href="/transfers"
-                      className={cn(
-                        "text-sm font-medium transition-colors hover:text-foreground/80",
-                        pathname === "/transfers"
-                          ? "text-foreground"
-                          : "text-foreground/60",
-                      )}
-                    >
-                      Transfers
-                    </Link>
-                  </>
-                )}
-                <Link
-                  href="/profile"
-                  className={cn(
-                    "text-sm font-medium transition-colors hover:text-foreground/80",
-                    pathname === "/profile"
-                      ? "text-foreground"
-                      : "text-foreground/60",
-                  )}
-                >
-                  Profile
-                </Link>
-              </>
-            )}
-          </div>
+    const activeStyle = {
+      ...baseStyle,
+      color: "var(--foreground, #000)",
+    };
+
+    const inactiveStyle = {
+      ...baseStyle,
+      color: "rgba(0, 0, 0, 0.6)",
+    };
+
+    return pathname === path ? activeStyle : inactiveStyle;
+  };
+
+  return (
+    <nav
+      style={{
+        position: "sticky",
+        top: 0,
+        zIndex: 40,
+        width: "100%",
+        borderBottom: "1px solid #e5e7eb",
+        backgroundColor: "rgba(255, 255, 255, 0.95)",
+        backdropFilter: "blur(10px)",
+      }}
+    >
+      <div
+        style={{
+          maxWidth: "1400px",
+          margin: "0 auto",
+          padding: "0 2rem",
+          height: "64px",
+          display: "flex",
+          alignItems: "center",
+          flexDirection: "row",
+        }}
+      >
+        {/* Brand - Home Link with increased font size */}
+        <Link
+          href="/"
+          style={{
+            fontWeight: "bold",
+            fontSize: "1.25rem", // Increased from 1.125rem to 1.25rem
+            marginRight: "3rem",
+            display: "inline-block",
+          }}
+        >
+          Park Management
+        </Link>
+
+        {/* Main Navigation Links */}
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "row",
+            alignItems: "center",
+          }}
+        >
+          {isAuthenticated && isProfileComplete && (
+            <>
+              <Link href="/reservations" style={getLinkStyle("/reservations")}>
+                Reservations
+              </Link>
+              <Link href="/transfers" style={getLinkStyle("/transfers")}>
+                Transfers
+              </Link>
+            </>
+          )}
+          {isAuthenticated && (
+            <Link href="/profile" style={getLinkStyle("/profile")}>
+              Profile
+            </Link>
+          )}
         </div>
 
-        {/* Auth Actions */}
-        <div className="flex items-center space-x-4">
+        {/* Spacer */}
+        <div style={{ flexGrow: 1 }}></div>
+
+        {/* Auth Links */}
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "row",
+            alignItems: "center",
+          }}
+        >
           {!isAuthenticated ? (
             <>
-              <Link
-                href="/auth/login"
-                className={cn(
-                  "text-sm font-medium transition-colors hover:text-foreground/80",
-                  pathname === "/auth/login"
-                    ? "text-foreground"
-                    : "text-foreground/60",
-                )}
-              >
+              <Link href="/auth/login" style={getLinkStyle("/auth/login")}>
                 Login
               </Link>
-              <Button asChild size="sm">
-                <Link href="/register">Register</Link>
-              </Button>
+              <div style={{ marginLeft: "1rem" }}>
+                <Button asChild size="sm">
+                  <Link href="/register" style={{ fontSize: "1rem" }}>
+                    Register
+                  </Link>
+                </Button>
+              </div>
             </>
           ) : (
-            <SignOutButton
-              variant="ghost"
-              size="sm"
-              className="text-destructive hover:text-destructive/90 hover:bg-destructive/10"
-              useNewButton={true}
-            />
+            <div style={{ marginLeft: "1rem" }}>
+              <SignOutButton
+                variant="ghost"
+                size="sm"
+                className="text-destructive hover:text-destructive/90 hover:bg-destructive/10"
+                useNewButton={true}
+              />
+            </div>
           )}
         </div>
       </div>
