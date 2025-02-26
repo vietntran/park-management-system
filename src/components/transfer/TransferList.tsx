@@ -205,7 +205,6 @@ const TransferList = ({
           </div>
         </section>
       )}
-
       {groupedTransfers.sent?.length > 0 && (
         <section>
           <h2 className="text-xl font-semibold mb-4">Sent Transfers</h2>
@@ -216,10 +215,13 @@ const TransferList = ({
           </div>
         </section>
       )}
-
       {!groupedTransfers.received?.length && !groupedTransfers.sent?.length && (
         <div className="text-center py-8 text-gray-500">
-          No pending transfers found
+          <p>No pending transfers found</p>
+          <p className="text-sm mt-2">
+            To transfer a reservation, visit your reservations page and select a
+            reservation to transfer.
+          </p>
         </div>
       )}
     </div>
