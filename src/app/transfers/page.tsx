@@ -1,18 +1,15 @@
 // src/app/transfers/page.tsx
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
 
 import TransferList from "@/components/transfer/TransferList";
 import { Alert, AlertDescription } from "@/components/ui/Alert";
-import { Button } from "@/components/ui/button";
 import { transferService } from "@/services/transferService";
 import type { Transfer } from "@/types/reservation";
 
 export default function TransfersPage() {
-  const router = useRouter();
   const { data: session } = useSession();
   const [transfers, setTransfers] = useState<Transfer[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -98,10 +95,7 @@ export default function TransfersPage() {
   return (
     <div className="container mx-auto py-8">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Reservation Transfers</h1>
-        <Button onClick={() => router.push("/transfers/create")}>
-          Create Transfer
-        </Button>
+        <h1 className="text-2xl font-bold">Pending Transfers</h1>
       </div>
 
       {error && (

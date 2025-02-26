@@ -168,22 +168,4 @@ describe("TransfersPage", () => {
       expect(screen.getByText("Failed to accept transfer")).toBeInTheDocument();
     });
   });
-
-  describe("Navigation", () => {
-    it("navigates to create transfer page when create button is clicked", async () => {
-      const user = userEvent.setup();
-
-      await act(async () => {
-        render(<TransfersPage />);
-      });
-
-      const createButton = screen.getByText("Create Transfer");
-
-      await act(async () => {
-        await user.click(createButton);
-      });
-
-      expect(mockRouter.push).toHaveBeenCalledWith("/transfers/create");
-    });
-  });
 });
