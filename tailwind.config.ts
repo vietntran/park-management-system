@@ -17,6 +17,7 @@ export default {
       },
     },
     extend: {
+      // Keep the existing CSS variable-based colors for ShadCN components
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
@@ -50,6 +51,31 @@ export default {
         card: {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
+        },
+
+        // Add direct grayscale colors for easier use
+        gray: {
+          50: "#f9fafb",
+          100: "#f3f4f6",
+          200: "#e5e7eb",
+          300: "#d1d5db",
+          400: "#9ca3af",
+          500: "#6b7280",
+          600: "#4b5563",
+          700: "#374151",
+          800: "#1f2937",
+          900: "#111827",
+          950: "#030712",
+        },
+
+        // Add common utility colors that are clearly visible
+        util: {
+          border: "#d1d5db", // Equivalent to gray-300
+          hover: "#f3f4f6", // Equivalent to gray-100
+          focus: "#3b82f6", // A clear blue
+          error: "#ef4444", // A clear red
+          success: "#10b981", // A clear green
+          warning: "#f59e0b", // A clear amber
         },
       },
       borderRadius: {

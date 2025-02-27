@@ -46,7 +46,6 @@ export const TransferForm = ({
   onSubmit,
   onCancel,
 }: TransferFormProps) => {
-  // const [error, setError] = useState<string | null>(null);
   const [isValidatingUsers, setIsValidatingUsers] = useState(false);
   const [selectedUserName, setSelectedUserName] = useState<string>("");
 
@@ -178,34 +177,45 @@ export const TransferForm = ({
                         key={spot.userId}
                         control={form.control}
                         name="spotsToTransfer"
-                        render={({ field }) => (
-                          <FormItem className="flex items-center space-x-3 space-y-0">
-                            <FormControl>
-                              <Checkbox
-                                checked={field.value?.includes(spot.userId)}
-                                onCheckedChange={async (checked) => {
-                                  const value = field.value || [];
-                                  const newValue = checked
-                                    ? [...value, spot.userId]
-                                    : value.filter((id) => id !== spot.userId);
+                        render={({ field }) => {
+                          const isChecked = field.value?.includes(spot.userId);
 
-                                  // Set value with validation
-                                  form.setValue("spotsToTransfer", newValue, {
-                                    shouldValidate: true,
-                                    shouldDirty: true,
-                                    shouldTouch: true,
-                                  });
+                          const toggleCheckbox = (checked: boolean) => {
+                            const value = field.value || [];
+                            const newValue = checked
+                              ? [...value, spot.userId]
+                              : value.filter((id) => id !== spot.userId);
 
-                                  // Trigger validation explicitly
-                                  await form.trigger("spotsToTransfer");
-                                }}
-                              />
-                            </FormControl>
-                            <FormLabel className="text-sm font-normal">
-                              {spot.user?.name} {spot.isPrimary && "(Primary)"}
-                            </FormLabel>
-                          </FormItem>
-                        )}
+                            // Set value with validation
+                            form.setValue("spotsToTransfer", newValue, {
+                              shouldValidate: true,
+                              shouldDirty: true,
+                              shouldTouch: true,
+                            });
+
+                            // Trigger validation
+                            form.trigger("spotsToTransfer");
+                          };
+
+                          return (
+                            <FormItem className="flex items-center space-x-3 space-y-0">
+                              <FormControl>
+                                <Checkbox
+                                  checked={isChecked}
+                                  onCheckedChange={toggleCheckbox}
+                                  id={`spot-${spot.userId}`}
+                                />
+                              </FormControl>
+                              <FormLabel
+                                className="text-sm font-normal cursor-pointer"
+                                htmlFor={`spot-${spot.userId}`}
+                              >
+                                {spot.user?.name}{" "}
+                                {spot.isPrimary && "(Primary)"}
+                              </FormLabel>
+                            </FormItem>
+                          );
+                        }}
                       />
                     ))}
                   </div>
@@ -224,10 +234,16 @@ export const TransferForm = ({
                       <Checkbox
                         checked={field.value}
                         onCheckedChange={field.onChange}
+                        id="primary-transfer"
                       />
                     </FormControl>
                     <div className="space-y-1">
-                      <FormLabel>Transfer Primary Role</FormLabel>
+                      <FormLabel
+                        className="cursor-pointer"
+                        htmlFor="primary-transfer"
+                      >
+                        Transfer Primary Role
+                      </FormLabel>
                       <p className="text-sm text-muted-foreground">
                         Transfer primary reservation holder responsibilities
                       </p>
@@ -245,12 +261,10 @@ export const TransferForm = ({
               </Alert>
             )}
 
-            <div className="flex justify-end">
+            <div className="flex justify-end space-x-4">
               <Button
                 type="submit"
                 disabled={form.formState.isSubmitting || isValidatingUsers}
-                className="mr-4"
-                style={{ marginRight: "16px" }}
               >
                 {form.formState.isSubmitting
                   ? "Creating Transfer..."

@@ -2,6 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
+/* 
+  Theme variables - these power the ShadCN UI components
+  Light mode values are defined in :root
+  Dark mode values are defined in .dark
+*/
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -66,11 +71,50 @@
   }
 }
 
+/* 
+  Base styles - applied to all elements 
+  Modified to not apply border-border to everything
+*/
 @layer base {
-  * {
+  /* Apply border color only to elements that have a border width */
+  *[class*="border"] {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+/* 
+  Component styles - reusable component patterns
+*/
+@layer components {
+  /* Form control styles */
+  .form-control-visible {
+    @apply h-5 w-5 rounded-md border-2 border-gray-300 bg-white;
+  }
+
+  /* Card styles */
+  .card-standard {
+    @apply rounded-lg border border-gray-200 bg-white shadow-sm p-4;
+  }
+
+  /* Button styles */
+  .button-base {
+    @apply rounded-md px-4 py-2 font-medium transition-colors;
+  }
+}
+
+/* 
+  Utility styles - single-purpose helper classes
+*/
+@layer utilities {
+  .border-visible {
+    @apply border-2 border-gray-300;
+  }
+
+  .focus-visible {
+    @apply focus:outline-none focus:ring-2 focus:ring-util-focus focus:ring-offset-2;
   }
 }
