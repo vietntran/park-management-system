@@ -24,6 +24,12 @@ interface ErrorLogPayload {
 // For logging errors to the server
 async function logError(error: Error, context?: ErrorContext) {
   try {
+    // Don't log abort errors
+    if (error.name === "AbortError" || error.message.includes("aborted")) {
+      console.log("Request was aborted, not logging to server");
+      return;
+    }
+
     const payload: ErrorLogPayload = {
       message: error.message,
       timestamp: new Date().toISOString(),
@@ -60,13 +66,22 @@ async function logError(error: Error, context?: ErrorContext) {
 
 // For handling errors in regular client code (with toast)
 export async function handleClientError(error: Error, context?: ErrorContext) {
-  toast.error(error.message || "An unexpected error occurred");
+  // Don't show toast for abort errors
+  if (error.name !== "AbortError" && !error.message.includes("aborted")) {
+    toast.error(error.message || "An unexpected error occurred");
+  }
   await logError(error, context);
 }
 
 // For handling form errors (without toast)
 export function handleFormError(error: unknown): string {
   if (error instanceof Error) {
+    // Don't return abort errors to the UI
+    if (error.name === "AbortError" || error.message.includes("aborted")) {
+      console.log("Request was aborted, not displaying error");
+      return "";
+    }
+
     // Just log the error, don't show toast
     logError(error, { path: window.location.pathname });
     return error.message;
