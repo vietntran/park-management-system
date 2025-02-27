@@ -67,7 +67,7 @@ export function ReservationDetail({
             </div>
             <div>
               <span className="font-semibold">Total Spots: </span>
-              {reservation.reservationUsers.length} of 60
+              {reservation.reservationUsers.length}
             </div>
           </div>
         </CardContent>
