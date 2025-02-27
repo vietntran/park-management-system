@@ -265,6 +265,7 @@ export const TransferForm = ({
               <Button
                 type="submit"
                 disabled={form.formState.isSubmitting || isValidatingUsers}
+                style={{ marginRight: "16px" }}
               >
                 {form.formState.isSubmitting
                   ? "Creating Transfer..."
