@@ -14,6 +14,12 @@ interface AvailabilityRangeData {
   maxCapacity: number;
 }
 
+interface RemoveUserResponse {
+  message: string;
+  reservationId: string;
+  removedUserId: string;
+}
+
 export const reservationService = {
   async getAvailableDates(
     startDate: Date,
@@ -73,5 +79,21 @@ export const reservationService = {
         "Content-Type": "application/json",
       },
     });
+  },
+
+  async removeUserFromReservation(
+    reservationId: string,
+    userId: string,
+  ): Promise<ApiResponse<RemoveUserResponse>> {
+    return typedFetch<RemoveUserResponse>(
+      `/api/reservations/${reservationId}/remove-user`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ userId }),
+      },
+    );
   },
 };

@@ -32,11 +32,19 @@ export function withErrorHandler<T>(handler: RouteHandler<T>): RouteHandler<T> {
     try {
       return await handler(req, context);
     } catch (error) {
+      // Safely extract userId if available
+      let userId: string | undefined;
+      if (context?.params) {
+        // Handle both Promise and direct object cases
+        const params = await Promise.resolve(context.params);
+        userId = params.userId as string | undefined;
+      }
+
       // Pass request context to error handler
       return handleServerError(error, {
         path: req.url,
         method: req.method,
-        userId: context?.params?.userId as string | undefined,
+        userId,
       }) as NextResponse<ApiResponse<T>>;
     }
   };

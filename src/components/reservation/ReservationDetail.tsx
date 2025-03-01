@@ -12,6 +12,7 @@ import { transferService } from "@/services/transferService";
 import { Reservation, TransferFormData } from "@/types/reservation";
 
 import { CancellationDialog } from "./CancellationDialog";
+import { RemoveUserDialog } from "./RemoveUserDialog";
 
 interface ReservationDetailProps {
   reservation: Reservation;
@@ -24,6 +25,12 @@ export function ReservationDetail({
 }: ReservationDetailProps) {
   const [showCancellationDialog, setShowCancellationDialog] = useState(false);
   const [showTransferForm, setShowTransferForm] = useState(false);
+  const [showRemoveUserDialog, setShowRemoveUserDialog] = useState(false);
+  const [userToRemove, setUserToRemove] = useState<{
+    id: string;
+    name: string;
+    email: string;
+  } | null>(null);
 
   const currentUserReservation = reservation.reservationUsers.find(
     (ru) => ru.userId === currentUserId,
@@ -42,6 +49,16 @@ export function ReservationDetail({
 
     // Redirect to reservations page
     window.location.href = "/reservations";
+  };
+
+  const handleRemoveUser = (userId: string, name: string, email: string) => {
+    setUserToRemove({ id: userId, name, email });
+    setShowRemoveUserDialog(true);
+  };
+
+  const handleRemovalComplete = () => {
+    // Refresh the page to show updated reservation
+    window.location.reload();
   };
 
   return (
@@ -95,7 +112,19 @@ export function ReservationDetail({
                   {currentUserReservation.isPrimary &&
                     !ru.isPrimary &&
                     ru.userId !== currentUserId && (
-                      <Button variant="ghost" size="icon" title="Remove user">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        title="Remove user"
+                        onClick={() =>
+                          ru.user &&
+                          handleRemoveUser(
+                            ru.userId,
+                            ru.user.name,
+                            ru.user.email,
+                          )
+                        }
+                      >
                         <UserMinus className="h-4 w-4" />
                       </Button>
                     )}
@@ -145,6 +174,16 @@ export function ReservationDetail({
           reservation={reservation}
           onCancel={() => setShowTransferForm(false)}
           onSubmit={handleTransferSubmit}
+        />
+      )}
+
+      {showRemoveUserDialog && userToRemove && (
+        <RemoveUserDialog
+          isOpen={showRemoveUserDialog}
+          onClose={() => setShowRemoveUserDialog(false)}
+          reservationId={reservation.id}
+          userToRemove={userToRemove}
+          onRemovalComplete={handleRemovalComplete}
         />
       )}
     </div>
