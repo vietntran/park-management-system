@@ -1,5 +1,4 @@
 import { ReservationStatus, ReservationUserStatus } from "@prisma/client";
-import { format } from "date-fns";
 import { PlusIcon, Users, ChevronRight } from "lucide-react";
 import { Metadata } from "next";
 import Link from "next/link";
@@ -10,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import type { Reservation } from "@/types/reservation";
+import { formatReservationDate } from "@/utils/dateUtils";
 
 export const metadata: Metadata = {
   title: "Reservations",
@@ -132,10 +132,7 @@ export default async function ReservationsPage() {
                     <div className="flex items-center justify-between p-4 rounded-lg border hover:bg-accent transition-colors">
                       <div className="space-y-1">
                         <p className="font-medium">
-                          {format(
-                            new Date(reservation.reservationDate),
-                            "EEEE, MMMM d, yyyy",
-                          )}
+                          {formatReservationDate(reservation.reservationDate)}s
                         </p>
                         <div className="flex items-center text-sm text-muted-foreground">
                           <Users className="mr-2 h-4 w-4" />
@@ -175,10 +172,7 @@ export default async function ReservationsPage() {
                     <div className="flex items-center justify-between p-4 rounded-lg border hover:bg-accent transition-colors">
                       <div className="space-y-1">
                         <p className="font-medium">
-                          {format(
-                            new Date(reservation.reservationDate),
-                            "EEEE, MMMM d, yyyy",
-                          )}
+                          {formatReservationDate(reservation.reservationDate)}
                         </p>
                         <div className="flex items-center text-sm text-muted-foreground">
                           <Users className="mr-2 h-4 w-4" />

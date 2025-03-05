@@ -1,6 +1,5 @@
 "use client";
 
-import { format } from "date-fns";
 import { Pencil, Trash2, UserMinus } from "lucide-react";
 import { useState } from "react";
 
@@ -10,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { transferService } from "@/services/transferService";
 import { Reservation, TransferFormData } from "@/types/reservation";
+import { formatReservationDate } from "@/utils/dateUtils";
 
 import { CancellationDialog } from "./CancellationDialog";
 import { RemoveUserDialog } from "./RemoveUserDialog";
@@ -72,7 +72,7 @@ export function ReservationDetail({
             <div className="flex justify-between items-center">
               <div>
                 <span className="font-semibold">Date: </span>
-                {format(new Date(reservation.reservationDate), "MMMM d, yyyy")}
+                {formatReservationDate(reservation.reservationDate)}
               </div>
               <Badge
                 variant={
