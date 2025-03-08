@@ -124,12 +124,7 @@ const Navigation = () => {
             </>
           ) : (
             <div style={{ marginLeft: "1rem" }}>
-              <SignOutButton
-                variant="ghost"
-                size="sm"
-                className="text-destructive hover:text-destructive/90 hover:bg-destructive/10"
-                useNewButton={true}
-              />
+              <SignOutButton variant="ghost" size="sm" />
             </div>
           )}
         </div>
