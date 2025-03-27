@@ -13,10 +13,9 @@ const Navigation = () => {
   const isAuthenticated = status === "authenticated";
   const isProfileComplete = session?.user?.isProfileComplete;
 
-  // Style for active vs inactive links - with increased font size
   const getLinkStyle = (path: string) => {
     const baseStyle = {
-      fontSize: "1rem", // Increased from 0.875rem to 1rem
+      fontSize: "1rem",
       fontWeight: 500,
       padding: "0.5rem 1rem",
       margin: "0 1rem",
@@ -60,12 +59,12 @@ const Navigation = () => {
           flexDirection: "row",
         }}
       >
-        {/* Brand - Home Link with increased font size */}
+        {/* Home Link */}
         <Link
-          href="/"
+          href="/dashboard"
           style={{
             fontWeight: "bold",
-            fontSize: "1.25rem", // Increased from 1.125rem to 1.25rem
+            fontSize: "1.25rem",
             marginRight: "3rem",
             display: "inline-block",
           }}

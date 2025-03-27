@@ -85,7 +85,6 @@ export default function LoginPage() {
               label="Email address"
               autoComplete="email"
               required
-              hideLabel
               placeholder="Email address"
               error={errors.email?.message}
               suppressHydrationWarning
@@ -97,7 +96,6 @@ export default function LoginPage() {
               label="Password"
               autoComplete="current-password"
               required
-              hideLabel
               placeholder="Password"
               error={errors.password?.message}
               suppressHydrationWarning
