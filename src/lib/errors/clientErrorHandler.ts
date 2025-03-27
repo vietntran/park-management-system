@@ -21,10 +21,12 @@ interface ErrorLogPayload {
   timestamp: string;
 }
 
+const RESERVATION_CONSECUTIVE_DAYS_ERROR =
+  "Cannot make reservation. Users are limited to 3 consecutive days.";
+
 // For logging errors to the server
 async function logError(error: Error, context?: ErrorContext) {
   try {
-    // Don't log abort errors
     if (error.name === "AbortError" || error.message.includes("aborted")) {
       console.log("Request was aborted, not logging to server");
       return;
@@ -64,10 +66,18 @@ async function logError(error: Error, context?: ErrorContext) {
   }
 }
 
+function shouldSuppressToast(errorMessage: string): boolean {
+  return errorMessage === RESERVATION_CONSECUTIVE_DAYS_ERROR;
+}
+
 // For handling errors in regular client code (with toast)
 export async function handleClientError(error: Error, context?: ErrorContext) {
-  // Don't show toast for abort errors
-  if (error.name !== "AbortError" && !error.message.includes("aborted")) {
+  // Don't show toast for abort errors or suppressed error patterns
+  if (
+    error.name !== "AbortError" &&
+    !error.message.includes("aborted") &&
+    !shouldSuppressToast(error.message)
+  ) {
     toast.error(error.message || "An unexpected error occurred");
   }
   await logError(error, context);
@@ -98,11 +108,20 @@ export async function handleApiError(response: Response): Promise<never> {
   const errorMessage = errorData.error || `API Error: ${response.status}`;
   const error = new Error(errorMessage);
 
-  await handleClientError(error, {
-    path: response.url,
-    statusCode: response.status,
-    method: "GET",
-  });
+  if (!shouldSuppressToast(errorMessage)) {
+    await handleClientError(error, {
+      path: response.url,
+      statusCode: response.status,
+      method: "GET",
+    });
+  } else {
+    // Still log the error but don't show toast
+    await logError(error, {
+      path: response.url,
+      statusCode: response.status,
+      method: "GET",
+    });
+  }
 
   throw error;
 }
